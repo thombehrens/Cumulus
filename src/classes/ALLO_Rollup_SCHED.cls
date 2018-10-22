@@ -104,28 +104,32 @@ public without sharing class ALLO_Rollup_SCHED extends UTIL_AbstractRollup_BATCH
         //get allocations settings
         Allocations_Settings__c alloSettings = UTIL_CustomSettingsFacade.getAllocationsSettings();
         if (alloSettings.Rollup_N_Day_Value__c==null) alloSettings.Rollup_N_Day_Value__c = 365;
-        string strFiscalOrCalendarYear = alloSettings.Use_Fiscal_Year_for_Rollups__c ? 'Fiscal_Year' : 'Calendar_Year';
-        string strExcludeOppRecTypesQuery = '';
-        string strExcludeOppTypesQuery = '';
+        String strFiscalOrCalendarYear = alloSettings.Use_Fiscal_Year_for_Rollups__c ? 'Fiscal_Year' : 'Calendar_Year';
+        String referenceToOpportunity = alloSettings.Payment_Allocations_Enabled__c ? 'Payment__r.npe01__Opportunity__r' : 'Opportunity__r';
+        String referenceToDateField = alloSettings.Payment_Allocations_Enabled__c ? 'Payment__r.npe01__Payment_Date__c' : 'Opportunity__r.CloseDate';
+        String donationReceivedClause = alloSettings.Payment_Allocations_Enabled__c ? 'Payment__r.npe01__Paid__c = TRUE' : 'Opportunity__r.IsWon = TRUE AND Opportunity__r.IsClosed = TRUE';
+
+        String strExcludeOppRecTypesQuery = '';
+        String strExcludeOppTypesQuery = '';
 
         // Instantiate the Fiscal Year utility
         CRLP_FiscalYears fiscalYrs = new CRLP_FiscalYears(alloSettings.Use_Fiscal_Year_for_Rollups__c);
 
         //build string of opp rec type names for query
         if (alloSettings.Excluded_Opp_RecTypes__c != null) {
-            strExcludeOppRecTypesQuery = 'AND Opportunity__r.RecordTypeId NOT IN ' + convertToQueryListFormat(alloSettings.Excluded_Opp_Rectypes__c);
+            strExcludeOppRecTypesQuery = 'AND ' + referenceToOpportunity + '.RecordTypeId NOT IN ' + convertToQueryListFormat(alloSettings.Excluded_Opp_Rectypes__c);
         }
 
         //make  opp types
         if (alloSettings.Excluded_Opp_Types__c != null) {
-            strExcludeOppTypesQuery = 'AND Opportunity__r.Type NOT IN ' + convertToQueryListFormat(alloSettings.Excluded_Opp_Types__c);
+            strExcludeOppTypesQuery = 'AND ' + referenceToOpportunity + '.Type NOT IN ' + convertToQueryListFormat(alloSettings.Excluded_Opp_Types__c);
         }
 
         list<RollupSpec> mySpecs = new list<RollupSpec>();
         
         //total all time / this year / last year / two years ago
         RollupSpec rs = new RollupSpec(UTIL_Namespace.StrTokenNSPrefix('Allocation__c'), UTIL_Namespace.StrTokenNSPrefix('General_Accounting_Unit__c'));
-        rs.filter = 'Opportunity__r.IsWon = TRUE AND Opportunity__r.IsClosed = TRUE ';
+        rs.filter = donationReceivedClause;
         //add built out exclusions to query
         rs.filter += strExcludeOppRecTypesQuery + strExcludeOppTypesQuery;
         rs.aggregateToParentFieldnameMap = new map<string, string> {
@@ -134,13 +138,13 @@ public without sharing class ALLO_Rollup_SCHED extends UTIL_AbstractRollup_BATCH
             'MIN(Amount__c)' => UTIL_Namespace.StrTokenNSPrefix('Smallest_Allocation__c'),
             'MAX(Amount__c)' => UTIL_Namespace.StrTokenNSPrefix('Largest_Allocation__c'),
             'AVG(Amount__c)' => UTIL_Namespace.StrTokenNSPrefix('Average_Allocation__c'),
-            'MIN(Opportunity__r.CloseDate)' => UTIL_Namespace.StrTokenNSPrefix('First_Allocation_Date__c'),
-            'MAX(Opportunity__r.CloseDate)' => UTIL_Namespace.StrTokenNSPrefix('Last_Allocation_Date__c')
+            'MIN('+referenceToDateField+')' => UTIL_Namespace.StrTokenNSPrefix('First_Allocation_Date__c'),
+            'MAX('+referenceToDateField+')' => UTIL_Namespace.StrTokenNSPrefix('Last_Allocation_Date__c')
         };
         
         Integer currentYear = fiscalYrs.getYear(Date.Today());
 
-        rs.subgroupExpression = strFiscalOrCalendarYear+'(Opportunity__r.CloseDate)';
+        rs.subgroupExpression = strFiscalOrCalendarYear+'('+referenceToDateField+')';
         rs.subgroupValueToParentFieldnameMap = new map<string, map<object, string>> {
             'SUM(Amount__c)' => new map<object, string> { 
                 currentYear => UTIL_Namespace.StrTokenNSPrefix('Total_Allocations_This_Year__c'), 
@@ -161,7 +165,7 @@ public without sharing class ALLO_Rollup_SCHED extends UTIL_AbstractRollup_BATCH
 
         //last 365 days
         RollupSpec rs2 = new RollupSpec(UTIL_Namespace.StrTokenNSPrefix('Allocation__c'), UTIL_Namespace.StrTokenNSPrefix('General_Accounting_Unit__c'));
-        rs2.filter = 'Opportunity__r.IsWon = TRUE AND Opportunity__r.IsClosed = TRUE AND Opportunity__r.CloseDate = LAST_N_DAYS:' + alloSettings.Rollup_N_Day_Value__c.intValue() + ' ';
+        rs2.filter = donationReceivedClause + ' AND ' + referenceToDateField + ' = LAST_N_DAYS:' + alloSettings.Rollup_N_Day_Value__c.intValue() + ' ';
         rs2.filter += strExcludeOppRecTypesQuery + strExcludeOppTypesQuery;
         rs2.aggregateToParentFieldnameMap = new map<string, string> {
             'SUM(Amount__c)' => UTIL_Namespace.StrTokenNSPrefix('Total_Allocations_Last_N_Days__c'),
