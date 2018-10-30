@@ -38,12 +38,6 @@
 @isTest
 private with sharing class ALLO_Rollup_TEST {
 
-    /*********************************************************************************************************
-    * @description If you only want to run a single test in this class, fill in its name here.
-    * If you want to run all tests, then use '*'
-    */
-    private static string strTestOnly = '*';
-
     /*******************************************************************************************************
     * @description Setup of allocations settings.
     * @param alloset An instance of Allocations_Settings__c custom setting. Calling this method with a null
@@ -63,7 +57,6 @@ private with sharing class ALLO_Rollup_TEST {
 
     /** @description Tests rollup button on general accounting units. */
     static testMethod void rollupBTN() {
-        if (strTestOnly != '*' && strTestOnly != 'rollupBTN') return;
         setupSettings(null);
 
         Account acc = new Account(Name='foo');
@@ -99,13 +92,11 @@ private with sharing class ALLO_Rollup_TEST {
         system.assertEquals(0, queryGAU[0].Total_Allocations_Last_Year__c, 'Total allocations last year should equal 0.');
         system.assertEquals(8, queryGAU[0].Total_Allocations_Two_Years_Ago__c, 'Total allocations two years ago should equal 8.');
         system.assertEquals(8, queryGAU[0].Total_Allocations_Last_N_Days__c, 'Total allocations last 365 days should equal 8.');
-
     }
 
     /** @description Tests rollup button on general accounting units with fiscal year enabled. This test is only different
     * from the above test if fiscal years are enabled in the current org; we can't set that setting in tests. */
     static testMethod void rollupFiscalYear() {
-        if (strTestOnly != '*' && strTestOnly != 'rollupBTN') return;
         setupSettings(new Allocations_Settings__c(Use_Fiscal_Year_for_Rollups__c=true));
 
         Account acc = new Account(Name='foo');
@@ -141,6 +132,50 @@ private with sharing class ALLO_Rollup_TEST {
         system.assertEquals(0, queryGAU[0].Total_Allocations_Last_Year__c, 'Total allocations last year should equal 0.');
         system.assertEquals(8, queryGAU[0].Total_Allocations_Two_Years_Ago__c, 'Total allocations two years ago should equal 8.');
         system.assertEquals(8, queryGAU[0].Total_Allocations_Last_N_Days__c, 'Total allocations last 365 days should equal 8.');
+    }
 
+    /** @description Tests rollup button on general accounting units. */
+    static testMethod void rollupPaymentAllocations() {
+        General_Accounting_Unit__c gau = new General_Accounting_Unit__c(Name='foo');
+        insert gau;
+
+        setupSettings(new Allocations_Settings__c(
+            Default_Allocations_Enabled__c = true,
+            Payment_Allocations_Enabled__c = true,
+            Default__c = gau.Id
+        ));
+
+        Account acc = new Account(Name='foo');
+        insert acc;
+        
+        list<Opportunity> oppsForInsert = new list<Opportunity>();
+        oppsForInsert.add(new Opportunity(Name='foo', Amount = 8, AccountID=acc.id, CloseDate=system.today(), StageName=UTIL_UnitTestData_TEST.getClosedWonStage()));
+        oppsForInsert.add(new Opportunity(Name='foo', Amount = 8, AccountID=acc.id, CloseDate=system.today().addYears(-2), StageName=UTIL_UnitTestData_TEST.getClosedWonStage()));
+        insert oppsForInsert;
+
+        List<npe01__OppPayment__c> payments = [SELECT Id FROM npe01__OppPayment__c];
+
+        list<Allocation__c> alloForInsert = new list<Allocation__c>();
+        alloForInsert.add(new Allocation__c(Payment__c=payments[0].id, Amount__c = 8, General_Accounting_Unit__c = gau.id));
+        alloForInsert.add(new Allocation__c(Payment__c=payments[1].id, Amount__c = 8, General_Accounting_Unit__c = gau.id));
+        insert alloForInsert;
+
+        PageReference pageRef = Page.ALLO_RollupBTN;
+        Test.setCurrentPage(pageRef);
+
+        CRLP_RecalculateBTN_CTRL ctrl = new CRLP_RecalculateBTN_CTRL(new ApexPages.StandardController(gau));
+
+        ctrl.buttonClick();
+
+        list<General_Accounting_Unit__c> queryGAU = [SELECT Id, First_Allocation_Date__c, Largest_Allocation__c, Last_Allocation_Date__c, Number_of_Allocations_Last_N_Days__c, Number_of_Allocations_Last_Year__c, Number_of_Allocations_This_Year__c, 
+                                                    Number_of_Allocations_Two_Years_Ago__c, Smallest_Allocation__c, Total_Allocations__c, Total_Allocations_Last_N_Days__c, Total_Allocations_Last_Year__c, Total_Allocations_This_Year__c, 
+                                                    Total_Allocations_Two_Years_Ago__c, Total_Number_of_Allocations__c FROM General_Accounting_Unit__c WHERE Id = :gau.id];
+        system.assertEquals(16, queryGAU[0].Total_Allocations__c, 'Total allocations should equal 16.');
+        system.assertEquals(system.today(), queryGAU[0].Last_Allocation_Date__c, 'Last allocation should be today.');
+        system.assertEquals(system.today().addYears(-2), queryGAU[0].First_Allocation_Date__c, 'First allocation should be two years ago.');
+        system.assertEquals(8, queryGAU[0].Total_Allocations_This_Year__c, 'Total allocations this year should equal 8.' + queryGAU[0]);
+        system.assertEquals(0, queryGAU[0].Total_Allocations_Last_Year__c, 'Total allocations last year should equal 0.');
+        system.assertEquals(8, queryGAU[0].Total_Allocations_Two_Years_Ago__c, 'Total allocations two years ago should equal 8.');
+        system.assertEquals(8, queryGAU[0].Total_Allocations_Last_N_Days__c, 'Total allocations last 365 days should equal 8.');
     }
 }
