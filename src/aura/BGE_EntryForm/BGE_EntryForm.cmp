@@ -35,12 +35,11 @@
   @description Component used to create DataImport__c records on the related NPSP_Data_Import_Batch__c record home.
 -->
 
-<aura:component controller="BGE_DataImportBatchEntry_CTRL">
+<aura:component implements="force:hasRecordId" controller="BGE_DataImportBatchEntry_CTRL">
 
     <!--Public Attributes-->
     <aura:attribute name="labels" type="Map" description="Labels retrieved in Apex related to Schema information." access="public"/>
     <aura:attribute name="donorType" type="String" default="Contact1" description="Used to circumvent unhelpful labeling of Account1/Contact1" access="public"/>
-    <aura:attribute name="recordId" type="Id" description="Populated by force:hasRecordId" access="public"/>
     <aura:attribute name="record" type="DataImport__c" description="Object" access="public"/>
     <aura:attribute name="dataImportFields" type="Object[]" description="List of dynamic field objects to use in the field iteration" access="public"/>
     <aura:attribute name="openOpportunities" type="List" description="List of open Opportunities" access="public" />
@@ -52,6 +51,7 @@
                     description="Controls whether Save is disabled because form has uncommitted changes" access="private"/>
 
     <!--Modal Attributes-->
+    <aura:attribute name="modalOpen" type="Boolean" description="Prevents multiple modals from opening"/>
     <aura:attribute name="donationModalHeader" type="Aura.ComponentDefRef[]" description="Formatted header text used in donation modal.">
         <h2 class="title slds-text-heading_medium">{!$Label.c.bgeMatchingSelect}</h2>
     </aura:attribute>
@@ -67,7 +67,8 @@
                               objectApiName="{!v.labels.dataImportObject}"
                               onsuccess="{!c.onSuccess}"
                               onsubmit="{!c.onSubmit}"
-                              onload="{!c.onFormLoad}">
+                              onload="{!c.onFormLoad}"
+                              onerror="{!c.onError}">
         <lightning:messages />
 
         <lightning:layout multipleRows="true">
@@ -92,18 +93,26 @@
                                     <aura:if isTrue="{!equals(v.selectedDonation, '')}">
                                         <p>{!$Label.c.bgeFormNewDonationHelptext}</p>
                                         <aura:set attribute="else">
-                                            <p class="slds-m-right_x-small">{!$Label.c.bgeFormUpdateHelptext}
-                                                <lightning:formattedUrl value="{! '/' + v.selectedDonation.Id}"
-                                                                        label="{!v.selectedDonation.Name}"
-                                                                        class="slds-m-left_x-small"
-                                                                        target="_blank"/>
-                                            </p>
+                                        <p class="slds-m-right_x-small">
+                                            <aura:if isTrue="{!v.selectedDonation.applyPayment}">
+                                                {!$Label.c.bgeFormNewPaymentHelptext}
+                                                <aura:set attribute="else">
+                                                    {!$Label.c.bgeFormUpdateHelptext}
+                                                </aura:set>
+                                            </aura:if>
+                                            <lightning:formattedUrl value="{! '/' + v.selectedDonation.Id}"
+                                                                    label="{!v.selectedDonation.Name}"
+                                                                    class="slds-m-left_x-small"
+                                                                    target="_blank"/>
+                                        </p>
                                         </aura:set>
                                     </aura:if>
-                                    <p>
-                                        <a onclick="{!c.openMatchModal}">{!$Label.c.bgeFormUpdateDonation}</a>
-                                    </p>
                                 </aura:set>
+                            </aura:if>
+                            <aura:if isTrue="{!or(v.selectedDonation, equals(v.selectedDonation, ''))}">
+                                <p>
+                                    <a onclick="{!c.openMatchModal}">{!$Label.c.bgeFormUpdateDonation}</a>
+                                </p>
                             </aura:if>
                         </div>
                     </div>
@@ -163,7 +172,9 @@
                         </lightning:select>
                         <aura:set attribute="else">
                             <label for="{!field.name}" class="slds-form-element__label">
-                                <aura:if isTrue="{!field.required}"><abbr class="slds-required" title="required">* </abbr></aura:if>
+                                <aura:if isTrue="{!field.required}">
+                                    <abbr class="slds-required" title="required">* </abbr>
+                                </aura:if>
                                 <span>{!field.label}</span>
                             </label>
                             <lightning:inputField aura:id="dynamicInputFields"

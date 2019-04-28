@@ -25,7 +25,7 @@
                 message = errors[0].message;
             }
         }
-        this.sendMessage('onError', {title: $A.get('$Label.c.PageMessagesError'), errorMessage: message});
+        this.sendMessage(component, 'onError', {title: $A.get('$Label.c.PageMessagesError'), errorMessage: message});
     },
 
     /**
@@ -60,16 +60,22 @@
         const selectedDonation = component.get('v.selectedDonation');
         const userSelectedMatch = $A.get('$Label.c.bdiMatchedByUser');
         const userSelectedNewOpp = $A.get('$Label.c.bdiMatchedByUserNewOpp');
+        const applyNewPayment = $A.get('$Label.c.bdiMatchedApplyNewPayment');
 
         //set status fields to prevent dry run overwrite of lookup fields
         //else status fields are left null to allow for dry run in grid
         if (selectedDonation) {
             if (selectedDonation.attributes.type === 'Opportunity') {
-                //selected opportunity; BDI will update the opportunity
                 rowFields[labels.opportunityImportedLookupField] = selectedDonation.Id;
-                rowFields[labels.opportunityImportedStatusField] = userSelectedMatch;
+                if (selectedDonation.applyPayment) {
+                    // Apply New Payment
+                    rowFields[labels.opportunityImportedStatusField] = applyNewPayment;
+                } else {
+                    // Update Opportunity
+                    rowFields[labels.opportunityImportedStatusField] = userSelectedMatch;
+                }
             } else {
-                //selected payment; BDI will update the payment
+                // Update Payment
                 rowFields[labels.paymentImportedLookupField] = selectedDonation.Id;
                 rowFields[labels.paymentImportedStatusField] = userSelectedMatch;
                 rowFields[labels.opportunityImportedLookupField] = selectedDonation.npe01__Opportunity__c;
@@ -101,7 +107,7 @@
             } else {
                 this.handleApexErrors(component, response.getError());
             }
-            this.sendMessage('hideFormSpinner', '');
+            this.sendMessage(component, 'hideFormSpinner', '');
         });
         $A.enqueueAction(action);
     },
@@ -114,13 +120,17 @@
         let channel = 'onError';
         let error = $A.get('$Label.c.exceptionRequiredField') + ' ' + missingFields.join(', ') + '.';
         let message = {title: $A.get('$Label.c.PageMessagesError'), errorMessage: error};
-        this.sendMessage(channel, message);
+        this.sendMessage(component, channel, message);
     },
 
     /**
      * @description: send a message to other components
      */
-    sendMessage: function (channel, message) {
+    sendMessage: function (component, channel, info) {
+        let message = {
+            info: info,
+            batchId: component.get('v.recordId')
+        };
         let sendMessage = $A.get('e.ltng:sendMessage');
         sendMessage.setParams({
             'channel': channel,
@@ -173,7 +183,7 @@
         for (let i=0; i<dataImportFields.length; i++) {
             if (dataImportFields[i].required) {
                 const fieldValue = dynamicInputFields[i].get('v.value');
-                if (fieldValue === '' || fieldValue === null) {
+                if (fieldValue === '' || fieldValue === null || (Array.isArray(fieldValue) && !fieldValue.length) ) {
                     missingFields.push(dataImportFields[i].label);
                 }
             }

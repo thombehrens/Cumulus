@@ -59,6 +59,14 @@ tasks:
         class_path: cumulusci.tasks.salesforce.Deploy
         options:
             path: unpackaged/config/qa
+            namespace_inject: $project_config.project__package__namespace
+
+    deploy_reports:
+        description: Deploys reports & dashboards
+        class_path: cumulusci.tasks.salesforce.Deploy
+        options:
+            path: unpackaged/config/reports
+            namespace_inject: $project_config.project__package__namespace
 
     deploy_dev_config_delete:
         description: Deploys the metadata deletions for the post-install DE org config
@@ -66,11 +74,16 @@ tasks:
         options:
             path: unpackaged/config/delete
 
-    robot_libdoc:
-        class_path: cumulusci.tasks.robotframework.RobotLibDoc
+    robot:
         options:
-            path: tests/NPSP.robot
-            output: tests/NPSP_Robot_Library.html
+            suites: robot/Cumulus/tests
+            options:
+                outputdir: robot/Cumulus/results
+
+    robot_libdoc:
+        options:
+            path: robot/Cumulus/resources/NPSP.py,robot/Cumulus/resources/NPSP.robot
+            output: robot/Cumulus/doc/Keywords.html
             
     update_admin_profile:
         options:
@@ -231,16 +244,20 @@ flows:
                 task: update_admin_profile
             8:
                 task: test_data_relationships
+            9:
+                task: deploy_reports
 
-    config_acctsc_rollups:
-        description: 'Deploys custom fields and rollups for testing account soft credits.'
+    deploy_rollup_testing:
+        description: 'Deploys custom fields and rollup definitions for testing Customizable Rollups using the Apex Anon testing script. >>> NOTE: Customizable Rollups needs to be successfully enabled before deploy_rollup_testing can be run <<<'
         steps:
             1:
-                task: enable_customizable_rollups
-            2:
                 task: deploy
                 options:
                     path: unpackaged/config/acctsc_rollups
+            2:
+                task: deploy
+                options:
+                    path: unpackaged/config/payment_rollups
             3:
                 task: update_admin_profile
 
@@ -260,6 +277,24 @@ flows:
                 options:
                     unmanaged: False
             4:
+                task: update_admin_profile
+                options:
+                    managed: true
+            5:
+                task: test_data_relationships
+            6:
+                task: deploy_reports
+                options:
+                    unmanaged: False
+
+    install_regression:
+        steps:
+            # Add QA metadata needed for regression
+            5:
+                task: deploy_qa_config
+                options:
+                    unmanaged: False
+            6:
                 task: update_admin_profile
                 options:
                     managed: true
@@ -321,6 +356,7 @@ orgs:
         dev_namespaced:
             config_file: orgs/dev.json
             namespaced: True
+            days: 7
         beta_middlesuffix:
             config_file: orgs/beta_middlesuffix.json
         beta_multicurrency:
@@ -338,3 +374,73 @@ orgs:
         enterprise:
             config_file: orgs/enterprise.json
 
+plans:
+    existing_org:
+        slug: install
+        title: Install NPSP
+        tier: primary
+        steps:
+            1:
+                flow: dependencies
+                ui_options:
+                    deploy_pre:
+                        account_record_types:
+                            name: Account Record Types
+                        opportunity_record_types:
+                            name: Opportunity Record Types
+            2:
+                task: install_managed
+            3:
+                task: deploy_post
+                options:
+                    unmanaged: False
+                ui_options:
+                    first:
+                        name: NPSP Config for Salesforce Mobile App
+    new_org:
+        slug: trial
+        title: Install NPSP Trial
+        # This will be tier: unlisted once that is an option.
+        tier: additional
+        is_listed: False
+        steps:
+            1:
+                flow: dependencies
+                ui_options:
+                    deploy_pre:
+                        account_record_types:
+                            name: Account Record Types
+                        opportunity_record_types:
+                            name: Opportunity Record Types
+            2:
+                task: install_managed
+            3:
+                flow: config_managed
+                options:
+                    deploy_reports:
+                        unmanaged: False
+                ui_options:
+                    deploy_post:
+                        first:
+                            name: NPSP Config for Salesforce Mobile App
+                    deploy_dev_config_delete:
+                        name: Delete Developer Edition Sample Profiles
+                        description: This deletes sample page layouts and profiles intended for Sales, Marketing, and Support use cases.
+                        is_required: False
+                    deploy_trial_config:
+                        name: NPSP Trial Experience
+                    deploy_reports:
+                        name: NPSP Reports & Dashboards
+                        is_required: False
+    reports:
+        slug: reports
+        title: Install Reports & Dashboards
+        tier: additional
+        is_listed: True
+        steps:
+            1:
+                task: deploy_reports
+                options:
+                    unmanaged: False
+                ui_options:
+                    name: NPSP Reports & Dashboards

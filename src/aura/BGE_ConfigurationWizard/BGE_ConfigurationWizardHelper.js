@@ -2,9 +2,10 @@
     /******************************** Init Functions *****************************/
     init: function(component) {
         var recordId = component.get('v.recordId');
+        var sourceBatchId = component.get('v.sourceBatchId');
         var action = component.get('c.getRecordDetails');
         action.setParams({
-            'recordId': recordId
+            'recordId': (sourceBatchId || recordId)
         });
         action.setCallback(this, function(response) {
             var state = response.getState();
@@ -40,12 +41,22 @@
         let batchInfo = {};
 
         //generic batch info
-        batchInfo.name = model.name;
-        batchInfo.id = model.id;
-        batchInfo.description = model.description;
-        batchInfo.expectedCount = model.expectedCount || 0;
-        batchInfo.expectedTotal = model.expectedTotal || 0;
-        batchInfo.recordCount = model.recordCount;
+        if (!component.get('v.sourceBatchId')) {
+            batchInfo.name = model.name;
+            batchInfo.id = model.id;
+            batchInfo.description = model.description;
+            batchInfo.expectedCount = model.expectedCount || 0;
+            batchInfo.expectedTotal = model.expectedTotal || 0;
+            batchInfo.recordCount = model.recordCount;
+        } else {
+            batchInfo.name = model.name + ' - ' + $A.get('$Label.c.bgeCopyBatchSetupBatchNameAppend');
+            // when copying setup from existing Batch, explicitly initialize these properties
+            batchInfo.id = null;
+            batchInfo.description = null;
+            batchInfo.expectedCount = 0;
+            batchInfo.expectedTotal = 0;
+            batchInfo.recordCount = null;
+        }
 
         // batch processing settings
         batchInfo.requireTotalMatch = model.requireTotalMatch;
@@ -53,7 +64,6 @@
         batchInfo.runOpportunityRollupsWhileProcessing = model.runOpportunityRollupsWhileProcessing;
         batchInfo.donationMatchingBehavior = model.donationMatchingBehavior;
         batchInfo.donationMatchingClass = model.donationMatchingClass;
-        batchInfo.donationMatchingOptions = model.donationMatchingOptions;
         batchInfo.donationMatchingRule = model.donationMatchingRule;
         batchInfo.donationDateRange = model.donationDateRange;
         batchInfo.postProcessClass = model.postProcessClass;
@@ -113,26 +123,34 @@
                 currentField.requiredInEntryForm = activeFieldMap.get(currentField.id).requiredInEntryForm;
                 currentField.sortOrder = activeFieldMap.get(currentField.id).sortOrder;
                 currentField.type = activeFieldMap.get(currentField.id).type;
-                currentField.formatter = activeFieldMap.get(currentField.id).formatter;
                 currentField.options = activeFieldMap.get(currentField.id).options;
                 currentField.alwaysRequired = activeFieldMap.get(currentField.id).alwaysRequired;
+                if (currentField.defaultValue && currentField.type == 'reference') {
+                    // recordeditform expects an array for a reference field
+                    currentField.defaultValue = [currentField.defaultValue];
+                }
             } else {
                 currentField.isActive = false;
             }
             currentField.availableSortOrder = availableSortOrder;
             availableSortOrder++;
+
             everyField.push(currentField);
+
         });
 
         // store everyField with its metadata
         component.set('v.everyField', everyField);
+
         // sort into groups by object
         // returns map of sobject name => list of fields
-        var activeFieldsBySObject = this.getActivesBySObject(component);
+        let activeFieldsBySObject = this.getActivesBySObject(component);
         // returns map of sobject name => list of fields
-        var allFieldsBySObject = this.groupFieldsBySObject(everyField);
+        var allFieldsBySObject = this.groupFieldsBySObject(component, everyField);
 
-        Object.keys(allFieldsBySObject).forEach(function(sObjectName) {
+        let sObjectNames = Object.keys(allFieldsBySObject);
+     
+        sObjectNames.forEach(function(sObjectName) {
             let currentFieldGroup = {
                 sObjectName: sObjectName,
                 options: [],
@@ -255,7 +273,7 @@
      */
     getActivesBySObject: function(component) {
         let activeFields = this.getActives(component);
-        var activesBySObject = this.groupFieldsBySObject(activeFields);
+        var activesBySObject = this.groupFieldsBySObject(component, activeFields);
         return activesBySObject;
     },
 
@@ -283,8 +301,15 @@
      * @param fields: list of fields to be grouped.
      * @return Map of SObject name to List of related fields.
      */
-    groupFieldsBySObject: function(fields) {
-        var result = {};
+    groupFieldsBySObject: function(component, fields) {
+
+        const opportunitySObjectName = component.get('v.wizardMetadata.labels.opportunitySObjectName');
+        const paymentSObjectName = component.get('v.wizardMetadata.labels.paymentSObjectName');
+
+        let result = {};
+        result[opportunitySObjectName] = [];
+        result[paymentSObjectName] = [];
+
         fields.forEach(function(currentField) {
             if ((currentField.sObjectName in result) === false) {
                 result[currentField.sObjectName] = [];
@@ -314,21 +339,7 @@
         if (isValid) {
             this.clearError(component);
         } else {
-            component.set('v.wizardMetadata.errorMessage', component.get('v.wizardMetadata.labels.missingNameDescriptionError'));
-        }
-        return isValid;
-    },
-
-    /**
-     * @description Checks validity object on every lightning:input field
-     * @return Boolean if user can proceed to next step
-     */
-    checkBatchFieldOptionsValidity: function(component) {
-        var isValid = component.find('defaultValueField').reduce(function(validSoFar, defaultValueField) {
-            return validSoFar && defaultValueField.get('v.validity').valid;
-        }, true);
-        if (isValid) {
-            this.clearError(component);
+            component.set('v.wizardMetadata.errorMessage', component.get('v.wizardMetadata.labels.missingNameError'));
         }
         return isValid;
     },
@@ -390,7 +401,7 @@
      */
     updateToActive: function(component) {
         var fieldCountPreviousObjects = 0;
-        var allFieldsBySObject = this.groupFieldsBySObject(component.get('v.everyField'));
+        var allFieldsBySObject = this.groupFieldsBySObject(component, component.get('v.everyField'));
         var everyFieldUpdated = [];
         Object.keys(allFieldsBySObject).forEach(function(currentSObject) {
             var batchFieldGroups = component.get('v.availableFieldsBySObject').fieldGroups;
@@ -414,13 +425,16 @@
      * @description Updates batchFieldOptions attribute based on selected fields
      */
     updateBatchFieldOptions: function(component) {
+        let donationMatchingOptions = [];
         let batchFieldOptions = {
             fieldGroups: []
         };
         let activeFieldsBySObject = this.getActivesBySObject(component);
-        Object.keys(activeFieldsBySObject).forEach(function(sObjectName) {
 
-            var currentFieldGroup = {
+        let sObjectNames = Object.keys(activeFieldsBySObject);
+        sObjectNames.forEach(function(sObjectName) {
+
+            let currentFieldGroup = {
                 sObjectName: sObjectName,
                 fields: []
             };
@@ -428,40 +442,28 @@
             activeFieldsBySObject[sObjectName].forEach(function(currentField) {
                 currentFieldGroup.fields.push(currentField);
                 currentFieldGroup.sObjectLabel = currentField.sObjectLabel;
+                donationMatchingOptions.push({
+                    label: currentField.label,
+                    value: currentField.name.toLowerCase()
+                });
             });
 
             batchFieldOptions.fieldGroups.push(currentFieldGroup);
 
         });
+
+        let selectedMatchingRule = component.get('v.batchInfo.donationMatchingRule');
+        let donationMatchingOptionValues = donationMatchingOptions.map(function (option) {
+            return option.value;
+        });
+        // Filter out any selected matching rules that aren't selected as available matching fields
+        selectedMatchingRule = selectedMatchingRule.filter(function (selectedRule) {
+            return (donationMatchingOptionValues.indexOf(selectedRule) >= 0);
+        });
+
         component.set('v.batchFieldOptions', batchFieldOptions);
-    },
-
-    /**
-     * @description Updates everyField with values from Set Field Options step
-     */
-    commitBatchFieldOptionsToEveryField: function(component) {
-
-        var batchFieldGroups = component.get('v.batchFieldOptions.fieldGroups');
-        var batchFieldOptions = [];
-        batchFieldGroups.forEach(function(currentFieldGroup) {
-            currentFieldGroup.fields.forEach(function(currentField) {
-                batchFieldOptions.push(currentField);
-            });
-        });
-
-        let everyField = component.get('v.everyField');
-
-        everyField.forEach(function(currentField) {
-            batchFieldOptions.forEach(function(currentActiveField) {
-                if (currentField.name === currentActiveField.name) {
-                    currentField.requiredInEntryForm = currentActiveField.requiredInEntryForm;
-                    currentField.hide = currentActiveField.hide;
-                    currentField.defaultValue = currentActiveField.defaultValue;
-                }
-            });
-        });
-
-        component.set('v.everyField',everyField);
+        component.set('v.batchInfo.donationMatchingOptions', donationMatchingOptions);
+        component.set("v.batchInfo.donationMatchingRule", selectedMatchingRule);
     },
 
     /**
@@ -471,6 +473,13 @@
         var batchInfo = component.get('v.batchInfo');
         // getActives grabs allFields, returns those isActive, sorted.
         let activeFields = this.getActives(component);
+
+        activeFields.forEach(function(currentField) {
+            if (currentField.defaultValue && currentField.type == 'reference') {
+                // lookups in recordeditform store as an array of IDs; need to flatten
+                currentField.defaultValue = currentField.defaultValue[0];
+            }
+        });
 
         var action = component.get('c.saveRecord');
         action.setParams({

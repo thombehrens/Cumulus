@@ -1271,6 +1271,14 @@ If you’re not sure how to resolve these errors, post a message in the Nonprofi
         <value>Warning</value>
     </labels>
     <labels>
+        <fullName>PageMessagesProcessing</fullName>
+        <categories>PageMessages</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Processing</shortDescription>
+        <value>Processing</value>
+    </labels>
+    <labels>
         <fullName>RD_ErrorAddDonationHeaderText</fullName>
         <categories>Recurring-Donations, Error</categories>
         <language>en_US</language>
@@ -1863,7 +1871,7 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <language>en_US</language>
         <protected>true</protected>
         <shortDescription>Sign on Payment and Allocation amount must match(Both positive or both negative)</shortDescription>
-        <value>Negative Allocations are only allowed in negative Payments and positive Allocations are not allowed in negative Payments.</value>
+        <value>Negative Allocations are only allowed in negative donations and positive Allocations are not allowed in negative donations.</value>
     </labels>
     <labels>
         <fullName>alloSingleParent</fullName>
@@ -2600,7 +2608,7 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <language>en_US</language>
         <protected>true</protected>
         <shortDescription>Used as field help text since help text is not upgradeable.</shortDescription>
-        <value>Specifies which fields to match by when trying to match Donations in batch records against existing Opportunties and Payments.</value>
+        <value>You can match against any of the Opportunity or Payment fields that you chose to include in this batch.</value>
     </labels>
     <labels>
         <fullName>bgeBatchDonorLookupInfo</fullName>
@@ -2681,6 +2689,34 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>Set Field Options</value>
     </labels>
     <labels>
+        <fullName>bgeCopyBatchSetupButton</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Button text for copying existing Batch setup to a new Batch.</shortDescription>
+        <value>Copy Batch Setup</value>
+    </labels>
+    <labels>
+        <fullName>bgeCopyBatchSetupBatchNameAppend</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Button text for copying existing Batch setup to a new Batch.</shortDescription>
+        <value>COPY</value>
+    </labels>
+    <labels>
+        <fullName>bgeDryRunComplete</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Success message when batch dry run completes in BGE.</shortDescription>
+        <value>Batch Dry Run Complete</value>
+    </labels>
+    <labels>
+        <fullName>bgeDonationSelectorHelp</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Help text to appear in Donation Selector modal in BGE.</shortDescription>
+        <value>This screen displays unpaid Payments and open Opportunities that have no unpaid Payments.</value>
+    </labels>
+    <labels>
         <fullName>bgeEditBatchFieldOptionsWarning</fullName>
         <language>en_US</language>
         <protected>true</protected>
@@ -2723,6 +2759,13 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>You are currently creating a new Opportunity.</value>
     </labels>
     <labels>
+        <fullName>bgeFormNewPaymentHelptext</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Help text to indicate user is applying a new payment to an opportunity</shortDescription>
+        <value>You are currently applying a new Payment to Opportunity:</value>
+    </labels>
+    <labels>
         <fullName>bgeFormNoneLink</fullName>
         <language>en_US</language>
         <protected>true</protected>
@@ -2730,11 +2773,18 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>Alternatively, create a new Opportunity.</value>
     </labels>
     <labels>
+        <fullName>bgeFormSelectedOpportunityApplyNewPayment</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Denotes donation selected in the BGE UI entry form will receive a new payment.</shortDescription>
+        <value>Applying New Payment</value>
+    </labels>
+    <labels>
         <fullName>bgeFormSelectedOpportunity</fullName>
         <language>en_US</language>
         <protected>true</protected>
         <shortDescription>Denotes donation selected in the BGE UI entry form.</shortDescription>
-        <value>Selected Opportunity</value>
+        <value>Updating this Opportunity</value>
     </labels>
     <labels>
         <fullName>bgeFormSelectedPayment</fullName>
@@ -2791,6 +2841,13 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <protected>true</protected>
         <shortDescription>Message preventing user from processing batch if there are errors.</shortDescription>
         <value>There are errors on one or more entries. You must resolve all errors before you can process this batch.</value>
+    </labels>
+    <labels>
+        <fullName>bgeGridErrorConflictingGifts</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Message preventing user from processing batch if there are conflicting gifts.</shortDescription>
+        <value>There are conflicting gifts in this batch. You will need to resolve these conflicts before you're able to process this batch.</value>
     </labels>
     <labels>
         <fullName>bgeGridErrorRequiredTotalsExpected</fullName>
@@ -2861,6 +2918,13 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <protected>true</protected>
         <shortDescription>Message warning user if totals don&apos;t match expected</shortDescription>
         <value>Require Expected Totals Match is selected but the Expected Count of Gifts and Expected Total Batch Amount fields are blank. Edit the batch details and either uncheck Require Expected Totals Match or add values in the related fields.</value>
+    </labels>
+    <labels>
+        <fullName>bgeBatchDryRun</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Text for batch dry run in BGE.</shortDescription>
+        <value>Batch Dry Run</value>
     </labels>
     <labels>
         <fullName>bgeMatchingAlert</fullName>
@@ -2956,6 +3020,22 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <protected>false</protected>
         <shortDescription>campaignMemberStatusResponded</shortDescription>
         <value>campaignMemberStatusResponded</value>
+    </labels>
+    <labels>
+        <fullName>CallableApiMethodNotImplemented</fullName>
+        <categories>API</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>CallableApi Method Not Implemented</shortDescription>
+        <value>{0} is not implemented</value>
+    </labels>
+    <labels>
+        <fullName>CallableApiParameterError</fullName>
+        <categories>API</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Error parsing/type casting a parameter</shortDescription>
+        <value>Error parsing {0} parameter</value>
     </labels>
     <labels>
         <fullName>conFailedAccountCreate</fullName>
@@ -4359,6 +4439,13 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>Do you want to remove this Contact from this Household on Save?</value>
     </labels>
     <labels>
+        <fullName>lblDeprecated</fullName>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Notify user component has been deprecated.</shortDescription>
+        <value>This component has been deprecated.</value>
+    </labels>
+    <labels>
         <fullName>lblExtendedStatus</fullName>
         <categories>UTIL_JobProgressLightning</categories>
         <language>en_US</language>
@@ -4948,7 +5035,7 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <language>en_US</language>
         <protected>false</protected>
         <shortDescription>pmtWizardBtnRemovePaidPayments</shortDescription>
-        <value>Remove Paid Payments</value>
+        <value>Remove Paid and Written Off Payments</value>
     </labels>
     <labels>
         <fullName>pmtWizardClosedLost</fullName>
@@ -5015,12 +5102,36 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <value>No opportunity found.</value>
     </labels>
     <labels>
+        <fullName>pmtWizardInvalidRecords</fullName>
+        <categories>Payment Wizard</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>pmtWizardInvalidRecords</shortDescription>
+        <value>NOTE: This Opportunity has payment record(s) that are both Paid and Written Off. You must deselect one or both checkboxes.</value>
+    </labels>
+    <labels>
+        <fullName>pmtWizardScheduleNoAmount</fullName>
+        <categories>Payment Wizard</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>pmtWizardNoAmount</shortDescription>
+        <value>NOTE: This Opportunity has no Amount. You must enter an Amount before you can schedule Payments.</value>
+    </labels>
+    <labels>
+        <fullName>pmtWizardWriteOffNoAmount</fullName>
+        <categories>Payment Wizard</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>pmtWizardNoAmount</shortDescription>
+        <value>NOTE: This Opportunity has no Amount. You must enter an Amount before you can write off Payments.</value>
+    </labels>
+    <labels>
         <fullName>pmtWizardNoUnpaidAmount</fullName>
         <categories>Payment Wizard</categories>
         <language>en_US</language>
         <protected>false</protected>
         <shortDescription>pmtWizardNoUnpaidAmount</shortDescription>
-        <value>NOTE: This Opportunity has no unpaid amount. To create Payments, first edit the Opportunity record and enter an amount, or click Remove Paid Payments to delete existing Payments. If the Opportunity's stage is closed, you may need to change it to an open stage.</value>
+        <value>All Payments for this Opportunity are either paid or written off. To create a new Payment schedule, click Delete Paid and Written Off Payments.</value>
     </labels>
     <labels>
         <fullName>pmtWizardNoWriteoffAmount</fullName>
@@ -5028,7 +5139,7 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <language>en_US</language>
         <protected>false</protected>
         <shortDescription>pmtWizardNoWriteoffAmount</shortDescription>
-        <value>NOTE: This Opportunity has no unpaid amount. To write off Payments, first edit the Opportunity record and enter an amount, or delete existing Payments.</value>
+        <value>All Payments for this Opportunity are either paid or written off. If you need to make changes to the Payment records, edit them directly.</value>
     </labels>
     <labels>
         <fullName>pmtWizardNumberOfPayments</fullName>
@@ -5140,7 +5251,7 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <language>en_US</language>
         <protected>false</protected>
         <shortDescription>pmtWizardWriteoffMessage</shortDescription>
-        <value>You are preparing to write off {0} Payment(s) totaling {1}.</value>
+        <value>You are preparing to write off {0} Payment(s) totaling {1}</value>
     </labels>
     <labels>
         <fullName>pmtWizardWriteoffNoAccessMessage</fullName>
@@ -5189,6 +5300,14 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <protected>false</protected>
         <shortDescription>pscManageSoftCreditsAmountMissing</shortDescription>
         <value>Please enter an amount or percent for each soft credit.</value>
+    </labels>
+    <labels>
+        <fullName>pscManageSoftCreditsContactMissing</fullName>
+        <categories>Manage Soft Credits</categories>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>pscManageSoftCreditsContactMissing</shortDescription>
+        <value>You must enter a Contact for each soft credit.</value>
     </labels>
     <labels>
         <fullName>pscManageSoftCreditsAmountOrPercent</fullName>
@@ -5716,6 +5835,14 @@ To check your GAU Allocation settings, go to Donations | GAU Allocations.</value
         <protected>false</protected>
         <shortDescription>stgCountOf</shortDescription>
         <value>Count of</value>
+    </labels>
+    <labels>
+        <fullName>stgCreatedBy</fullName>
+        <categories>Settings</categories>
+        <language>en_US</language>
+        <protected>false</protected>
+        <shortDescription>stgCreatedBy</shortDescription>
+        <value>Created By</value>
     </labels>
     <labels>
         <fullName>stgCRLPHouseholdAccountError</fullName>
@@ -7698,6 +7825,14 @@ Note: The NPSP Settings tab is visible in the Nonprofit Success Pack application
         <protected>true</protected>
         <shortDescription>Label for dynamic number of years ago</shortDescription>
         <value>{0} Years Ago</value>
+    </labels>
+    <labels>
+        <fullName>stgLastModifiedBy</fullName>
+        <categories>Settings</categories>
+        <language>en_US</language>
+        <protected>true</protected>
+        <shortDescription>Last Modified By</shortDescription>
+        <value>Last Modified By</value>
     </labels>
     <labels>
         <fullName>stgLinkDelete</fullName>

@@ -19,7 +19,7 @@
      * @description: alerts parent component that form needs to be reset
      */
     cancelForm: function (component, event, helper) {
-        helper.sendMessage('onCancel', '');
+        helper.sendMessage(component, 'onCancel', '');
         component.destroy();
     },
 
@@ -39,7 +39,7 @@
      * @description: alerts parent component that form is loaded
      */
     onFormLoad: function (component, event, helper) {
-        helper.sendMessage('hideFormSpinner', '');
+        helper.sendMessage(component, 'hideFormSpinner', '');
         component.find('donorType').focus();
     },
 
@@ -53,7 +53,7 @@
         const lookupValueIsValidId = lookupValue.length === 18;
 
         if (lookupValueIsValidId) {
-            helper.sendMessage('showFormSpinner', '');
+            helper.sendMessage(component, 'showFormSpinner', '');
             helper.queryOpenDonations(component, lookupValue);
         }
     },
@@ -63,7 +63,7 @@
      */
     onSubmit: function (component, event, helper) {
         event.preventDefault();
-        component.set('v.pendingSave',true);
+        component.set('v.pendingSave', true);
         var completeRow = helper.getRowWithHiddenFields(component, event);
         var validity = helper.validateFields(component, completeRow);
 
@@ -71,10 +71,16 @@
             component.find('recordEditForm').submit(completeRow);
         } else if (validity.missingFields.length !== 0) {
             helper.sendErrorToast(component, validity.missingFields);
-            component.set('v.pendingSave',false);
-        } else {
-            //do nothing since data format errors display inline
+            // Allow users to attempt another save
+            component.set('v.pendingSave', false);
         }
+    },
+
+    /**
+     * @description: reenable save button when there's an inline error
+     */
+    onError: function (component, event, helper) {
+        component.set('v.pendingSave', false);
     },
 
     /**
@@ -82,7 +88,7 @@
      */
     onSuccess: function (component, event, helper) {
         var message = {'recordId': event.getParams().response.id};
-        helper.sendMessage('onSuccess', message);
+        helper.sendMessage(component, 'onSuccess', message);
         component.destroy();
     },
 
@@ -90,7 +96,13 @@
      * @description: launches modal so user can select open donation
      */
     openMatchModal: function(component, event, helper) {
-        $A.createComponent('c:BGE_DonationSelector', {
+        let setModalOpenToFalse = function() {
+            component.set('v.modalOpen', false);
+        }
+
+        if (!component.get('v.modalOpen')) {
+            component.set('v.modalOpen', true);
+            $A.createComponent('c:BGE_DonationSelector', {
                 'aura:id': 'donationSelector',
                 'name': 'donationSelector',
                 'unpaidPayments': component.get('v.unpaidPayments'),
@@ -104,20 +116,19 @@
                         header: component.get('v.donationModalHeader'),
                         body: newcomponent,
                         showCloseButton: true,
-                        cssClass: 'slds-modal_large'
+                        cssClass: 'slds-modal_large',
+                        closeCallback: setModalOpenToFalse
                     });
-                } else if (status === 'INCOMPLETE') {
+                } else {
+                    setModalOpenToFalse();
                     const message = {
                         title: $A.get('$Label.c.PageMessagesError'),
-                        errorMessage: $A.get('$Label.c.stgUnknownError')
+                        errorMessage: status === 'ERROR' ? errorMessage : $A.get('$Label.c.stgUnknownError')
                     };
-                    helper.sendMessage('onError', message);
-
-                } else if (status === 'ERROR') {
-                    const message = {title: $A.get('$Label.c.PageMessagesError'), errorMessage: errorMessage};
-                    helper.sendMessage('onError', message);
+                    helper.sendMessage(component, 'onError', message);
                 }
             });
+        }
     },
 
     /**
@@ -128,7 +139,7 @@
         component.set('v.donorType', donorType);
 
         let message = {'donorType': donorType};
-        helper.sendMessage('setDonorType', message);
+        helper.sendMessage(component, 'setDonorType', message);
         helper.clearDonationSelectionOptions(component);
     }
 

@@ -40,20 +40,22 @@
                 access="global">
 
     <!--Public Attributes-->
-    <aura:attribute name="recordId" type="Id" description="ID of the Batch record" access="public"/>
     <aura:attribute name="data" type="List" default="[]" description="Data Import records that appear in the table" access="public"/>
     <aura:attribute name="errors" type="Map" description="Dry run errors to display on the lightning:dataTable" access="public"/>
     <aura:attribute name="columns" type="List" description="Columns for the table" access="public"/>
+    <aura:attribute name="referenceFields" type="List" description="Reference fields used in this batch" access="private"/>
     <aura:attribute name="labels" type="Map" description="Labels retrieved in Apex related to Schema information." access="public"/>
     <aura:attribute name="dataImportFields" type="Object[]" default="[]" description="List of Data Import fields to use in the new row component." access="public"/>
     <aura:attribute name="donorType" type="String" default="Contact1" description="Used to circumvent unhelpful labeling of Account1/Contact1" access="public"/>
     <aura:attribute name="record" type="Object" description="Batch record information used in the Data Service." access="public" />
     <aura:attribute name="totals" type="Map" default="{countGifts: 0, totalGiftAmount: 0}" description="Map to track data count and amount totals" access="public"/>
-    <aura:attribute name="batchFields" type="List" description="Fields that drive force:recordData"/>
-    <aura:attribute name="isLoaded" type="Boolean" default="false" description="Updated in setModel when data is loaded"/>
-    <aura:attribute name="isNamespaced" type="Boolean" default="true" description="Indicates if org has namespacing"/>
-    <aura:attribute name="entryFormBody" type="Aura.Component[]" description="Facet used to hold the BGE_EntryForm component"/>
-    <aura:attribute name="sObjectName" type="String" />
+    <aura:attribute name="batchFields" type="List" description="Fields that drive force:recordData" access="public"/>
+    <aura:attribute name="isLoaded" type="Boolean" default="false" description="Updated in setModel when data is loaded" access="public"/>
+    <aura:attribute name="isNamespaced" type="Boolean" default="true" description="Indicates if org has namespacing" access="public"/>
+    <aura:attribute name="entryFormBody" type="Aura.Component[]" description="Facet used to hold the BGE_EntryForm component" access="public"/>
+    <aura:attribute name="totalNumberOfRows" type="Integer" description="Total number of data import records in the datatable"/>
+    <aura:attribute name="enableInfiniteLoading" type="Boolean" default="true" access="private"/>
+    <aura:attribute name="modalOpen" type="Boolean" description="Prevents multiple modals from opening"/>
 
     <!--Events-->
     <aura:handler name="init" action="{!c.doInit}" value="{!this}"/>
@@ -93,6 +95,7 @@
                 </div>
                 <div class="slds-col slds-no-flex slds-grid slds-align-top slds-p-bottom_xx-small headerButtonActions">
                     <lightning:buttonGroup>
+                        <lightning:button aura:id="dryRunBatch" label="{!$Label.c.bgeBatchDryRun}" onclick="{!c.batchDryRunClick}"/>
                         <lightning:button aura:id="processBatch" label="{!$Label.c.bgeProcessBatch}" onclick="{!c.processBatch}"/>
                         <lightning:button aura:id="editBGEBatch" label="{!$Label.c.stgBtnEdit}" onclick="{!c.onEditClick}"/>
                     </lightning:buttonGroup>
@@ -116,7 +119,7 @@
 
         <!--Start BGE Table-->
         <lightning:layoutItem size="12" class="slds-p-vertical_x-small">
-            <lightning:card title="{!$Label.c.bgeGridAllGifts}" class="bgeCard">
+            <lightning:card title="{!$Label.c.bgeGridAllGifts}">
 
                 <lightning:spinner aura:id="dataTableSpinner" alternativeText="{!$Label.c.labelMessageLoading}"/>
 
@@ -180,16 +183,18 @@
                 <!--End expected totals-->
 
                 <aura:if isTrue="{!notequals(v.data.length, 0)}">
-                    <div class="{!if(lessthan(v.data.length, 4), 'datatableContainer', '')+' slds-p-top_small'}">
+                    <div class="{!if(lessthan(v.data.length, 4), 'datatableContainer', '')+' slds-p-top_small fixedHeightDatatable'}">
                         <lightning:datatable
                                 aura:id="dataImportRowsDataTable"
                                 columns="{!v.columns}"
                                 data="{!v.data}"
                                 errors="{!v.errors}"
+                                enableInfiniteLoading="{!v.enableInfiniteLoading}"
+                                hideCheckboxColumn="true"
                                 keyField="Id"
                                 oncellchange="{!c.onCellChange}"
+                                onloadmore="{!c.onLoadMore}"
                                 minColumnWidth="150"
-                                hideCheckboxColumn="true"
                                 onrowaction="{!c.handleRowAction}"
                                 showRowNumberColumn="true"
                         />
