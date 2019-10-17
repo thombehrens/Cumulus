@@ -127,60 +127,109 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
     }
 
     /*******************************************************************************************************
-    * @description Retrieves all open Opportunities and unpaid Payments for the selected Donor (Account or Contact)
-    * @return JSON stringified Map<String, List<SObject>> of all openOpportunities and unpaidPayments for the given donor
+    * @description Retrieves all open Opportunities and related Payments for the selected Donor (Account or Contact)
+    * @return JSON string of all open Opportunities and related Payments for the given donor
     */
     @AuraEnabled
-    public static String getOpenDonations(Id donorId, String donorType) {
+    public static String getOpportunitiesWithOppPayments(Id donorId) {
+        Schema.SObjectType token = donorId.getSobjectType();
+
         String relationshipField;
-        if (donorType == 'Account1') {
+        if (token == Account.SObjectType) {
             relationshipField = 'AccountId';
-        } else if (donorType == 'Contact1') {
+        } else if (token == Contact.SObjectType) {
             relationshipField = 'Primary_Contact__c';
+        } else {
+            throw new AuraHandledException('SObjectType ' + token + ' is not supported.');
         }
 
-        String opportunitySOQL = 'SELECT Id, ' +
-                                'Name, ' +
-                                'StageName, ' +
-                                'Amount ' +
-                                'FROM Opportunity ' +
-                                'WHERE ' + relationshipField + ' = :donorId ' +
-                                'AND IsClosed = false';
-
-        String paymentSOQL = 'SELECT Id, ' +
-                                'Name, ' +
-                                'npe01__Scheduled_Date__c, ' +
-                                'npe01__Opportunity__r.Name, ' +
-                                'npe01__Opportunity__c, ' +
-                                'npe01__Payment_Amount__c ' +
-                                'FROM npe01__OppPayment__c ' +
-                                'WHERE npe01__Opportunity__r.' + relationshipField + ' = :donorId ' +
-                                'AND npe01__Paid__c = false';
+        String query = 'SELECT Id, ' +
+                'Name, ' +
+                'StageName, ' +
+                'Amount, ' +
+                    '(SELECT Id, ' +
+                    'Name, ' +
+                    'npe01__Scheduled_Date__c, ' +
+                    'npe01__Opportunity__r.Name, ' +
+                    'npe01__Opportunity__c, ' +
+                    'npe01__Payment_Amount__c,' +
+                    'npe01__Paid__c, ' +
+                    'npe01__Written_Off__c ' +
+                    'FROM npe01__OppPayment__r ' +
+                    'WHERE npe01__Written_Off__c = false) ' +
+                'FROM Opportunity ' +
+                'WHERE ' + relationshipField + ' = :donorId ' +
+                'AND IsClosed = false';
 
         try {
-            List<Opportunity> openOpportunities = Database.query(opportunitySOQL);
-            List<npe01__OppPayment__c> unpaidPayments = Database.query(paymentSOQL);
-
-            Map<Id, Opportunity> openOpportunitiesById = new Map<Id, Opportunity>(openOpportunities);
-
-            // openOpportunities should only include opps with NO UNPAID PAYMENTS for BDI to process donations correctly
-            for (npe01__OppPayment__c payment : unpaidPayments) {
-                Id idOfCurrentOpportunity = payment.npe01__Opportunity__c;
-                if (openOpportunitiesById.containsKey(idOfCurrentOpportunity)) {
-                    openOpportunitiesById.remove(idOfCurrentOpportunity);
-                }
+            List<OpportunityWrapper> opportunityWrappers = new List<OpportunityWrapper>();
+            for (Opportunity opportunity : Database.query(query)) {
+                opportunityWrappers.add(new OpportunityWrapper(opportunity));
             }
-
-            Map<String, List<SObject>> response = new Map<String, List<SObject>>{
-                'openOpportunities' => openOpportunitiesById.values(),
-                'unpaidPayments' => unpaidPayments
-            };
-            return JSON.serialize(response);
+            return JSON.serialize(opportunityWrappers);
         } catch (Exception ex){
             throw new AuraHandledException('ERROR: ' + ex.getMessage());
         }
     }
 
+    /**
+    * @description Wrapper class used to hold only the information needed in the
+    * component for each Opportunity.  The component does not need to store any of
+    * the paid or written-off Payments for a donor, but it does need to know if the Donation
+    * has related Payments that have not been written-off. In that case the User should not
+    * be able to update the Opportunity in the BGE Donation Selector.
+    */
+    @TestVisible
+    private class OpportunityWrapper {
+        @TestVisible Opportunity opportunity {get; private set;}
+        @TestVisible List<npe01__OppPayment__c> unpaidPayments {get; private set;}
+        @TestVisible Boolean hasNonWrittenOffPayments {get; private set;}
+
+        private OpportunityWrapper(Opportunity opportunity) {
+            this.opportunity = opportunity;
+            initialize();
+        }
+
+        private void initialize() {
+            if (unpaidPayments == null) {
+                unpaidPayments = new List<npe01__OppPayment__c>();
+            }
+
+            if (opportunity.npe01__OppPayment__r.isEmpty()) {
+                hasNonWrittenOffPayments = false;
+                return;
+            }
+
+            for (npe01__OppPayment__c oppPayment : opportunity.npe01__OppPayment__r) {
+                if (hasNonWrittenOffPayments == null
+                        && oppPayment.npe01__Written_Off__c == false) {
+                    hasNonWrittenOffPayments = true;
+                }
+
+                if (isAvailableForUpdate(oppPayment)) {
+                    unpaidPayments.add(oppPayment);
+                } else {
+                    continue;
+                }
+            }
+
+            //If hasNonWrittenOffPayments is null after looping all of the Payments,
+            //then all of the Opp's Payments are written-off, and hasNonWrittenOffPayments can
+            //be set to false, as this Opp should be treated in the BGE Donation Selector UI
+            //as if it has 0 Payments.
+            if (hasNonWrittenOffPayments == null) {
+                hasNonWrittenOffPayments = false;
+            }
+        }
+
+        private Boolean isAvailableForUpdate(npe01__OppPayment__c oppPayment) {
+            if (oppPayment.npe01__Paid__c || oppPayment.npe01__Written_Off__c) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+    }
 
     /*******************************************************************************************************
     * @description runs BDI Dry Run against a given Id based on the processing settings of a given batch
@@ -192,7 +241,9 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
     public static String runSingleDryRun(Id dataImportId, Id batchId) {
         try {
             Data_Import_Settings__c dataImportSettings = BDI_DataImportService.loadSettings(batchId);
-            List<DataImport__c> dataImportListToRun = prepareDataImportsForDryRun(getDataImportRecordsByIds(batchId, new List<Id>{dataImportId}));
+            List<DataImport__c> dataImportListToRun = prepareDataImportsForDryRun(
+                getDataImportRecordsByIds(batchId, new List<Id>{dataImportId}));
+                
             BDI_DataImport_API.processDataImportRecords(dataImportSettings, dataImportListToRun, true);
 
             DataImportModel dataImportModel = getUpdatedTotals(batchId);
@@ -209,7 +260,8 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
     }
 
     /*******************************************************************************************************
-    * @description runs BDI Dry Run against all Data Import records based on the processing settings of a given batch
+    * @description runs BDI Dry Run against all Data Import records based on the processing settings of a 
+    *  given batch
     * @param batchId: ID of the NPSP_Data_Import_Batch__c
     * @return DataImportModel with updated data import record row and updated totals for the batch
     */
@@ -227,14 +279,16 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
             }
 
             if (rawDataImportsToPrepareForDryRun.size() > 0) {
-                List<DataImport__c> dataImportListToRun = prepareDataImportsForDryRun(rawDataImportsToPrepareForDryRun);
+                List<DataImport__c> dataImportListToRun = 
+                    prepareDataImportsForDryRun(rawDataImportsToPrepareForDryRun);
                 BDI_DataImport_API.processDataImportRecords(dataImportSettings, dataImportListToRun, true);
             }
 
             DataImportModel dataImportModel = getUpdatedTotals(batchId);
 
             List<DataImportRow> rows = new List<DataImportRow>();
-            List<DataImport__c> dataImportsToReturn = getNumOfDataImportRecordsByBatchId(batchId, numberOfRowsToReturn);
+            List<DataImport__c> dataImportsToReturn = 
+                getNumOfDataImportRecordsByBatchId(batchId, numberOfRowsToReturn);
             for (DataImport__c di : dataImportsToReturn) {
                 DataImportRow processedDataImportRow = new DataImportRow(di);
                 rows.add(processedDataImportRow);
@@ -260,7 +314,8 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
             Database.update(dataImport);
             return runSingleDryRun(dataImport.Id, batchId);
         } catch (Exception ex) {
-            String saveErrorMessage = String.format(Label.CRLP_SaveError, new List<String>{Schema.SObjectType.DataImport__c.getName()});
+            String saveErrorMessage = String.format(Label.CRLP_SaveError, 
+                new List<String>{Schema.SObjectType.DataImport__c.getName()});
             throw new AuraHandledException(saveErrorMessage + '. ' + ex.getMessage());
         }
     }
@@ -352,7 +407,11 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
     * @return Decimal amount
     */
     private static AggregateResult[] getDataImportBatchTotalAmount(Id recordId) {
-        return [SELECT Sum(Donation_Amount__c)amount FROM DataImport__c WHERE NPSP_Data_Import_Batch__c =: recordId];
+        return [
+            SELECT Sum(Donation_Amount__c)amount 
+            FROM DataImport__c 
+            WHERE NPSP_Data_Import_Batch__c =: recordId
+        ];
     }
 
     /*******************************************************************************************************
@@ -391,8 +450,32 @@ public with sharing class BGE_DataImportBatchEntry_CTRL {
                 if (dataImportDFR != null) {
 
                     if (UTIL_Permissions.canUpdate(dataImportDFR, false)) {
-                        String targetObject = BDI_DataImportService.getTargetObject(dataImportDFR.name);
-                        String targetField = BDI_DataImportService.getTargetField(dataImportDFR.name);
+
+                        String targetObject = '';
+                        String targetField = '';
+                        BDI_TargetFields targetFields = 
+                            BGE_BatchGiftEntry_UTIL.targetFieldsBySourceField.get(
+                                dataImportDFR.getSObjectField());
+
+                        Map<SObjectType, Set<SObjectField>> targetFieldsByTargetObject = 
+                            targetFields.getTargetFieldsByTargetObject();
+
+                        // One DI field can be mapped to multiple target fields although it will be rare 
+                        // and presents some issues with picklists; here we will return info for the first 
+                        // match
+                        for (Schema.SObjectType targetSObjType: targetFieldsByTargetObject.keySet()) {
+                            String aTargetObjectName = targetSObjType.getDescribe().getName();
+                            if (BGE_BatchGiftEntry_UTIL.objectGroupNameByAllowedObjects.containsKey(
+                                aTargetObjectName)) {
+
+                                targetObject = aTargetObjectName;
+                                List<SObjectField> mappedTargetFields = 
+                                    new List<SObjectField> (targetFieldsByTargetObject.get(targetSObjType));
+                                if(mappedTargetFields.size() > 0) {
+                                    targetField = mappedTargetFields[0].getDescribe().getName();
+                                }
+                            }
+                        }
                         DescribeFieldResult targetDFR = UTIL_Describe.getFieldDescribe(targetObject, targetField);
 
                         Column col = new Column();

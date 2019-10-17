@@ -107,17 +107,33 @@ public class CRLP_ConfigBuilder_SVC {
      * particular deployment and not a previous one.
      */
     public static String deployedQueuedMetadataTypes() {
-        String jobId = getUniqueJobId();
+        String jobId = CMT_MetadataAPI.getUniqueJobId();
         CMT_MetadataAPI.deployMetadata(jobId, queuedMetadataTypes.clone());
         return jobId;
     }
 
-    /**
-     * @return A 10 character unique 'jobId' to use for
-     */
-    private static String getUniqueJobId() {
-        return UserInfo.getUserId().left(15).right(4).toUpperCase() +
-                String.valueOf(Integer.valueOf(math.rint(math.random()*5000000))).right(6);
-    }
+    /******************************************************************************************************************
+     * @description Pass the List<CustomMetadata>> to the CMT_MetadataAPI for deployment with a metadata handler
+     * and a parameter list
+     * @param metadataHandler is a callback to handle the success or failure of the deployment
+     * @param params is a map of objects that the callback handler uses
+     * @return A unique jobId. This value is used when writing the final status to the Customizable_Rollup_Settings__c
+     * object and is needed to ensure that the status retrieved from that custom settings object is for this
+     * particular deployment and not a previous one.
+    ******************************************************************************************************************/
+    public static String deployedQueuedMetadataTypes(
+        CMT_MetadataAPI.MetadataCallbackHandler metadataHandler, 
+        Map<String, Object> params) {
 
+        String jobId = CMT_MetadataAPI.getUniqueJobId();
+
+        CMT_MetadataAPI.MetadataCallBack callback = new CMT_MetadataAPI.MetadataCallBack(jobId);
+        if (metadataHandler != null) {
+            callback.callbackHandler = metadataHandler;
+            callback.callbackParams = params;
+        }
+
+        CMT_MetadataAPI.deployMetadata(queuedMetadataTypes.clone(), callback);
+        return jobId;
+    }
 }

@@ -1,10 +1,10 @@
 /*
     Copyright (c) 2019, Salesforce.org
     All rights reserved.
-    
+
     Redistribution and use in source and binary forms, with or without
     modification, are permitted provided that the following conditions are met:
-    
+
     * Redistributions of source code must retain the above copyright
       notice, this list of conditions and the following disclaimer.
     * Redistributions in binary form must reproduce the above copyright
@@ -15,16 +15,16 @@
       from this software without specific prior written permission.
 
     THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT 
-    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS 
-    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE 
-    COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, 
-    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, 
-    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
-    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER 
-    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT 
-    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN 
-    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+    COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
     POSSIBILITY OF SUCH DAMAGE.
 */
 /**
@@ -52,20 +52,48 @@ global with sharing class Callable_API implements System.Callable {
     global Object call(String action, Map<String, Object> params) {
         String cleanActionText = (String.isBlank(action) ? '' : action.toLowerCase());
 
+        CallableApiParameters paramService = new CallableApiParameters(params);
+
         switch on (cleanActionText) {
             when 'tdtm.disablealltriggers' {
                 TDTM_Config_API.disableAllTriggers();
 
             } when 'opp.mapstagetostate' {
-                return OPP_StageMappingUtil.determineOppStateFromOppStage((String) params.get('OpportunityStage'));
+                String oppStage = paramService.getString(CallableApiParameters.PARAM_OPPORTUNITY_STAGE);
+                return OPP_StageMappingUtil.determineOppStateFromOppStage(oppStage);
 
             } when 'crlp.getdefinitionsforrolluptype' {
+                String rollupType = paramService.getString(CallableApiParameters.PARAM_ROLLUP_TYPE);
+
                 CRLP_ApiService crlpApiSvc = new CRLP_ApiService();
-                List<CRLP_Rollup> response = crlpApiSvc.getRollupDefinitions((String) params.get(CRLP_ApiService.PARAM_ROLLUPTYPE));
+                List<CRLP_Rollup> response = crlpApiSvc.getRollupDefinitions(rollupType);
+
                 return JSON.serialize(response, true);
 
-            } when 'crlp.executerollups' {  // PLACEHOLDER CODE ONLY
-                return params.get(CRLP_ApiService.PARAM_ROLLUPDEFS);
+            } when 'crlp.executerollups' {
+                Id parentId = paramService.getString(CallableApiParameters.PARAM_ROLLUP_PARENTID);
+                String rollupType = paramService.getString(CallableApiParameters.PARAM_ROLLUP_TYPE);
+                List<CRLP_Rollup> rollupDefs = paramService.getRollupDefinitions(CallableApiParameters.PARAM_ROLLUP_DEFS);
+                Boolean commitToDb = paramService.getBoolean(CallableApiParameters.PARAM_ROLLUP_COMMIT, false);
+                Map<Id, Map<SObjectType, List<SObject>>> rollupData = paramService.getRollupDataMap(CallableApiParameters.PARAM_ROLLUP_DATA);
+
+                CRLP_ApiService crlpApiSvc = new CRLP_ApiService();
+                rollupDefs = crlpApiSvc.executeRollups(parentId, rollupType, rollupDefs, rollupData, commitToDb);
+
+                return JSON.serialize(rollupDefs,false);
+
+            } when 'crlp.iscrlpenabled' {
+                CRLP_ApiService crlpApiSvc = new CRLP_ApiService();
+                return crlpApiSvc.isCrlpEnabled();
+
+            } when 'err.dispatchaction' {
+                // This method is to be used only by Salesforce.org apps and is subject to change at any time. Do NOT call this method.
+                // If you do so, your functionality can break without any warning or liability from Salesforce.
+                // If you have any questions, please inquire on the Power of Us Hub.
+
+                // Since there are multiple actions that can be invoked, the ERR_Dispatch_API will get the remaining params out of the
+                // parameter service depending on which action was invoked
+                return CallableDispatchService_ERR.getInstanceOf(paramService).dispatch();
 
             } when else {
                 throw new MalformedMethodInvocationException(
@@ -76,7 +104,6 @@ global with sharing class Callable_API implements System.Callable {
 
         // if the action does not return a value then return success
         return true;
-
     }
 
 }

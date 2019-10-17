@@ -40,26 +40,6 @@ public class CRLP_RollupBatch_SVC {
     private static final Customizable_Rollup_Settings__c customizableRollupSettings = UTIL_CustomSettingsFacade.getCustomizableRollupSettings();
 
     /**
-     * @description Returns the Summary ObjectType based on the specific JobType
-     * @param jobType Rollup Job Type Enum
-     */
-    public static SObjectType getSummaryObjectType(CRLP_RollupProcessingOptions.RollupType jobType) {
-        if (jobType == CRLP_RollupProcessingOptions.RollupType.AccountHardCredit ||
-                jobType == CRLP_RollupProcessingOptions.RollupType.AccountContactSoftCredit ||
-                jobType == CRLP_RollupProcessingOptions.RollupType.AccountSoftCredit) {
-            return Account.SObjectType;
-        } if (jobType == CRLP_RollupProcessingOptions.RollupType.ContactHardCredit ||
-                jobType == CRLP_RollupProcessingOptions.RollupType.ContactSoftCredit) {
-            return Contact.SObjectType;
-        } if (jobType == CRLP_RollupProcessingOptions.RollupType.GAU) {
-            return General_Accounting_Unit__c.SObjectType;
-        } if (jobType == CRLP_RollupProcessingOptions.RollupType.RecurringDonations) {
-            return npe03__Recurring_Donation__c.SObjectType;
-        }
-        return null;
-    }
-
-    /**
      * @description Returns a portion of the WHERE clause to use to filter "Skew" or "NonSkew" mode records. This is
      * effectively the only place where the fields needed to make this determination are referenced.
      * @param jobType Rollup Job Type Enum
@@ -111,8 +91,7 @@ public class CRLP_RollupBatch_SVC {
                 queryFilter = '(' + softCreditField + ' >= ' + maxRelatedOppsForNonLDVMode + ')';
             }
 
-        } else if (jobType == CRLP_RollupProcessingOptions.RollupType.AccountContactSoftCredit ||
-                jobType == CRLP_RollupProcessingOptions.RollupType.AccountSoftCredit) {
+        } else if (CRLP_Rollup_SVC.isOppContactRoleSoftCreditRollup(jobType)) {
             // TODO -- How to get Accounts that require using this method for Soft Credits??
             // For now just use the NumberOfClosedOpportunities field as a proxy for the number of SoftCredits
             String softCreditField = parentRelationshipField + 'npo02__NumberOfClosedOpps__c';
@@ -271,10 +250,13 @@ public class CRLP_RollupBatch_SVC {
                                     batchSize = customizableRollupSettings.Rollups_Contact_Batch_Size__c;
                                 }
                                 when AccountContactSoftCredit {
-                                    batchSize = customizableRollupSettings.Rollups_Account_Soft_Credit_Batch_Size__c;
+                                    batchSize = customizableRollupSettings.Rollups_AcctContactSoftCredit_Batch_Size__c;
                                 }
                                 when ContactSoftCredit {
                                     batchSize = customizableRollupSettings.Rollups_Contact_Soft_Credit_Batch_Size__c;
+                                }
+                                when AccountSoftCredit {
+                                    batchSize = customizableRollupSettings.Rollups_Account_Soft_Credit_Batch_Size__c;
                                 }
                             }
                         }
@@ -291,6 +273,9 @@ public class CRLP_RollupBatch_SVC {
                                 }
                                 when ContactSoftCredit {
                                     batchSize = customizableRollupSettings.Rollups_Contact_SkewMode_Batch_Size__c;
+                                }
+                                when AccountSoftCredit {
+                                    batchSize = customizableRollupSettings.Rollups_Account_SkewMode_Batch_Size__c;
                                 }
                             }
                         }

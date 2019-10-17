@@ -35,8 +35,14 @@
 * Needs to be "without sharing" so that the Install Script can run it.
 */
 public without sharing class UTIL_CustomSettingsFacade {
-    private static final String DEFAULT_OPPORTUNITY_CONTACT_ROLE_DONOR = 'Donor';
+    public static final String DEFAULT_OPPORTUNITY_CONTACT_ROLE_DONOR = 'Donor';
     public static final String DEFAULT_OPPORTUNITY_CONTACT_ROLE_SOFT_CREDIT = 'Soft Credit';
+
+    public static final Integer DEFAULT_ROLLUP_SKEW_MODE_BATCH_SIZE = 1000;
+    public static final Integer DEFAULT_ROLLUP_BATCH_SIZE = 200;
+    public static final Integer DEFAULT_ROLLUP_SKEW_DISPATCHER_SIZE = 300;
+    public static final Integer DEFAULT_ROLLUP_ATTACHED_OPP_SKEW_LIMIT  = 250;
+
 
     //storing user-level custom settings in-memory to avoid trying to isert/update them
     //twice and thus trigger the "duplicate OwnerId" error
@@ -131,17 +137,23 @@ public without sharing class UTIL_CustomSettingsFacade {
     * returned record already exists or doesn't exist in the database.
     */
     public static npe03__Recurring_Donations_Settings__c getRecurringDonationsSettings() {
-        if(Test.isRunningTest() && recurringDonationsSettings == null) {
+
+        if (Test.isRunningTest() && recurringDonationsSettings == null) {
         	recurringDonationsSettings = new npe03__Recurring_Donations_Settings__c();
         	configRecurringDonationsSettings(recurringDonationsSettings);
+
         } else if (recurringDonationsSettings == null) {
             recurringDonationsSettings = npe03__Recurring_Donations_Settings__c.getInstance();
-            if(recurringDonationsSettings.Id == null)
+
+            if (recurringDonationsSettings.Id == null) {
                 recurringDonationsSettings = getOrgRecurringDonationsSettings();
-            else if (recurringDonationsSettings.npe03__Open_Opportunity_Behavior__c == null) {
+
+            } else if (recurringDonationsSettings.npe03__Open_Opportunity_Behavior__c == null) {
                 configRecurringDonationsSettings(recurringDonationsSettings);
-                if(!Test.isRunningTest())
+
+                if (!Test.isRunningTest()) {
                     upsert recurringDonationsSettings;
+                }
             }
         }
         return recurringDonationsSettings;
@@ -285,8 +297,9 @@ public without sharing class UTIL_CustomSettingsFacade {
             dataImportSettings = new Data_Import_Settings__c();
         } else if (dataImportSettings == null) {
             dataImportSettings = Data_Import_Settings__c.getInstance();
-            if (dataImportSettings.Id == null)
+            if (dataImportSettings.Id == null){
                 dataImportSettings = getOrgDataImportSettings();
+            }
         }
         // always call config, to deal with new settings we've added
         // we'll only config those setting that are null
@@ -336,14 +349,18 @@ public without sharing class UTIL_CustomSettingsFacade {
     * @return npe03__Recurring_Donations_Settings__c Org-level settings for Recurring Donations.
     */
     public static npe03__Recurring_Donations_Settings__c getOrgRecurringDonationsSettings() {
-        if(orgRecurringDonationsSettings == null) {
+        if (orgRecurringDonationsSettings == null) {
             orgRecurringDonationsSettings = npe03__Recurring_Donations_Settings__c.getOrgDefaults();
-            if(orgRecurringDonationsSettings.Id == null || orgRecurringDonationsSettings.npe03__Open_Opportunity_Behavior__c == null) {
+
+            if (orgRecurringDonationsSettings.Id == null || orgRecurringDonationsSettings.npe03__Open_Opportunity_Behavior__c == null) {
                 configRecurringDonationsSettings(orgRecurringDonationsSettings);
-                if(!Test.isRunningTest())
+
+                if (!Test.isRunningTest()) {
                     upsert orgRecurringDonationsSettings;
+                }
             }
         }
+
         return orgRecurringDonationsSettings;
     }
 
@@ -550,6 +567,7 @@ public without sharing class UTIL_CustomSettingsFacade {
         hs.npo02__Soft_Credit_Roles__c = 'Matched Donor;Soft Credit;Household Member';
         hs.Matched_Donor_Role__c = 'Matched Donor';
         hs.npo02__Household_Contact_Roles_On__c = true;
+        hs.Seasonal_Addresses_Batch_Size__c = 10;
 
         // new HH Account model overrides having HH objects
         if (contactsSettings != null && contactsSettings.npe01__Account_Processor__c == CAO_Constants.HH_ACCOUNT_PROCESSOR) {
@@ -557,21 +575,26 @@ public without sharing class UTIL_CustomSettingsFacade {
         }
     }
 
-    private static void configRecurringDonationsSettings(npe03__Recurring_Donations_Settings__c rds) {
+    private static void configRecurringDonationsSettings(npe03__Recurring_Donations_Settings__c settings) {
         //if the save behavior is null, then we'll need to upsert new settings, otherwise, we have valid settings as its
         //the only field w/o a default defined
-        if (rds.npe03__Open_Opportunity_Behavior__c == null) {
-            rds.npe03__Add_Campaign_to_All_Opportunites__c = true;
-            rds.npe03__Enable_Update_Check__c = true;
-            //rds.npe03__Error_Email_Notifications__c = 'All Sys Admins'; *This field has been moved to the ERR_Settings__c custom setting
-            rds.npe03__Maximum_Donations__c = 50;
-            rds.Recurring_Donation_Batch_Size__c = 50;
-            rds.npe03__Opportunity_Forecast_Months__c = 12;
-            rds.npe03__Update_Check_Interval__c = 90;
-            rds.npe03__Open_Opportunity_Behavior__c = RD_RecurringDonations.RecurringDonationCloseOptions.Mark_Opportunities_Closed_Lost.name();
+        if (settings.npe03__Open_Opportunity_Behavior__c == null) {
+
+            settings.npe03__Add_Campaign_to_All_Opportunites__c = true;
+            settings.npe03__Enable_Update_Check__c = true;
+            settings.npe03__Maximum_Donations__c = 50;
+            settings.Recurring_Donation_Batch_Size__c = 50;
+            settings.npe03__Opportunity_Forecast_Months__c = 12;
+            settings.npe03__Update_Check_Interval__c = 90;
+            settings.npe03__Open_Opportunity_Behavior__c = RD_RecurringDonations.RecurringDonationCloseOptions.Mark_Opportunities_Closed_Lost.name();
+
+            settings.EnableAutomaticNaming__c = false;
+            settings.IsRecurringDonations2Enabled__c = false;
+
             List<RecordType> oppRecordTypes = [select id from RecordType where sobjecttype = 'Opportunity' and IsActive = true];
-            if(oppRecordTypes.size() > 0)
-                rds.npe03__Record_Type__c = oppRecordTypes[0].id;
+            if (oppRecordTypes.size() > 0) {
+                settings.npe03__Record_Type__c = oppRecordTypes[0].id;
+            }
         }
     }
 
@@ -586,8 +609,9 @@ public without sharing class UTIL_CustomSettingsFacade {
     private static void configErrorSettings(Error_Settings__c es, String notificationsTo) {
         es.Store_Errors_On__c = true;
         es.Error_Notifications_On__c = true;
-        es.Error_Notifications_To__c = ERR_Notifier.NotificationOptions.sysAdmins;
+        es.Error_Notifications_To__c = ERR_Notifier.ERROR_NOTIFICATION_RECIPIENT_ALL_SYS_ADMINS;
         es.Disable_Error_Handling__c = false;
+        es.OverrideFeature_PilotEnabled__c = false;
         es.Enable_Debug__c = false;
         es.Respect_Duplicate_Rule_Settings__c = false;
     }
@@ -640,6 +664,12 @@ public without sharing class UTIL_CustomSettingsFacade {
         if (dis.Donation_Date_Range__c == null) {
             dis.Donation_Date_Range__c = 0;
         }
+        if (dis.Default_Data_Import_Field_Mapping_Set__c == null) {
+            dis.Default_Data_Import_Field_Mapping_Set__c = BDI_FieldMappingCustomMetadata.DEFAULT_DATA_IMPORT_FIELD_MAPPING_SET_NAME;
+        }
+        if (dis.Field_Mapping_Method__c  == null) {
+            dis.Field_Mapping_Method__c  = BDI_DataImportService.FM_HELP_TEXT;
+        }
     }
 
     /*******************************************************************************************************
@@ -672,6 +702,7 @@ public without sharing class UTIL_CustomSettingsFacade {
         contactsSettings.Payments_Auto_Close_Stage_Name__c = mySettings.Payments_Auto_Close_Stage_Name__c;
         contactsSettings.Honoree_Opportunity_Contact_Role__c = mySettings.Honoree_Opportunity_Contact_Role__c;
         contactsSettings.Notification_Recipient_Opp_Contact_Role__c = mySettings.Notification_Recipient_Opp_Contact_Role__c;
+        contactsSettings.Enforce_Accounting_Data_Consistency__c = mySettings.Enforce_Accounting_Data_Consistency__c;
         orgContactsSettings = contactsSettings;
         return contactsSettings;
     }
@@ -764,6 +795,7 @@ public without sharing class UTIL_CustomSettingsFacade {
 
         errorSettings.Error_Notifications_On__c = mySettings.Error_Notifications_On__c;
         errorSettings.Error_Notifications_To__c = mySettings.Error_Notifications_To__c;
+        errorSettings.OverrideFeature_PilotEnabled__c = mySettings.OverrideFeature_PilotEnabled__c;
         errorSettings.Store_Errors_On__c = mySettings.Store_Errors_On__c;
         errorSettings.Respect_Duplicate_Rule_Settings__c = mySettings.Respect_Duplicate_Rule_Settings__c;
         orgErrorSettings = errorSettings;
@@ -794,20 +826,26 @@ public without sharing class UTIL_CustomSettingsFacade {
     /*******************************************************************************************************
     * @description Creates instance of settings to use in tests. It does not insert it, but all other methods will see these settings
     * as the configured settings.
-    * @parameter mySettings Settings instance with the values to set.
+    * @parameter settings Settings instance with the values to set.
     * @return npe03__Recurring_Donations_Settings__c The configured settings.
     **/
-    public static npe03__Recurring_Donations_Settings__c getRecurringDonationsSettingsForTest(npe03__Recurring_Donations_Settings__c mySettings) {
-        if (recurringDonationsSettings == null)
+    public static npe03__Recurring_Donations_Settings__c getRecurringDonationsSettingsForTest(npe03__Recurring_Donations_Settings__c settings) {
+        if (recurringDonationsSettings == null) {
             recurringDonationsSettings = new npe03__Recurring_Donations_Settings__c();
+        }
 
-        recurringDonationsSettings.npe03__Opportunity_Forecast_Months__c = mySettings.npe03__Opportunity_Forecast_Months__c;
-        recurringDonationsSettings.npe03__Maximum_Donations__c = mySettings.npe03__Maximum_Donations__c;
-        recurringDonationsSettings.npe03__Open_Opportunity_Behavior__c = mySettings.npe03__Open_Opportunity_Behavior__c;
-        recurringDonationsSettings.npe03__Add_Campaign_to_All_Opportunites__c = mySettings.npe03__Add_Campaign_to_All_Opportunites__c;
-        recurringDonationsSettings.npe03__Error_Email_Notifications__c = mySettings.npe03__Error_Email_Notifications__c;
-        recurringDonationsSettings.Recurring_Donation_Batch_Size__c = mySettings.Recurring_Donation_Batch_Size__c;
+        recurringDonationsSettings.npe03__Opportunity_Forecast_Months__c = settings.npe03__Opportunity_Forecast_Months__c;
+        recurringDonationsSettings.npe03__Maximum_Donations__c = settings.npe03__Maximum_Donations__c;
+        recurringDonationsSettings.npe03__Open_Opportunity_Behavior__c = settings.npe03__Open_Opportunity_Behavior__c;
+        recurringDonationsSettings.npe03__Add_Campaign_to_All_Opportunites__c = settings.npe03__Add_Campaign_to_All_Opportunites__c;
+        recurringDonationsSettings.npe03__Error_Email_Notifications__c = settings.npe03__Error_Email_Notifications__c;
+        recurringDonationsSettings.Recurring_Donation_Batch_Size__c = settings.Recurring_Donation_Batch_Size__c;
+
+        recurringDonationsSettings.EnableAutomaticNaming__c = settings.EnableAutomaticNaming__c;
+        recurringDonationsSettings.IsRecurringDonations2Enabled__c = settings.IsRecurringDonations2Enabled__c;
+
         orgRecurringDonationsSettings = recurringDonationsSettings;
+
         return recurringDonationsSettings;
     }
 
@@ -870,15 +908,16 @@ public without sharing class UTIL_CustomSettingsFacade {
     private static void configRollupSettings(Customizable_Rollup_Settings__c crs) {
         // New default settings for the Customizable Rollups engine
         crs.Customizable_Rollups_Enabled__c = false;
-        crs.Rollups_Account_Batch_Size__c = 200;
-        crs.Rollups_Contact_Batch_Size__c = 200;
-        crs.Rollups_Account_SkewMode_Batch_Size__c = 1000;
-        crs.Rollups_Contact_SkewMode_Batch_Size__c = 1000;
-        crs.Rollups_Account_Soft_Credit_Batch_Size__c = 200;
-        crs.Rollups_Contact_Soft_Credit_Batch_Size__c = 200;
-        crs.Rollups_GAU_Batch_Size__c = 1000;
-        crs.Rollups_Skew_Dispatcher_Batch_Size__c = 300;
-        crs.Rollups_Limit_on_Attached_Opps_for_Skew__c = 250;
+        crs.Rollups_Account_Batch_Size__c = DEFAULT_ROLLUP_BATCH_SIZE;
+        crs.Rollups_Contact_Batch_Size__c = DEFAULT_ROLLUP_BATCH_SIZE;
+        crs.Rollups_Account_SkewMode_Batch_Size__c = DEFAULT_ROLLUP_SKEW_MODE_BATCH_SIZE;
+        crs.Rollups_Contact_SkewMode_Batch_Size__c = DEFAULT_ROLLUP_SKEW_MODE_BATCH_SIZE;
+        crs.Rollups_Account_Soft_Credit_Batch_Size__c = DEFAULT_ROLLUP_BATCH_SIZE;
+        crs.Rollups_Contact_Soft_Credit_Batch_Size__c = DEFAULT_ROLLUP_BATCH_SIZE;
+        crs.Rollups_AcctContactSoftCredit_Batch_Size__c = DEFAULT_ROLLUP_BATCH_SIZE;
+        crs.Rollups_GAU_Batch_Size__c = DEFAULT_ROLLUP_SKEW_MODE_BATCH_SIZE;
+        crs.Rollups_Skew_Dispatcher_Batch_Size__c = DEFAULT_ROLLUP_SKEW_DISPATCHER_SIZE;
+        crs.Rollups_Limit_on_Attached_Opps_for_Skew__c = DEFAULT_ROLLUP_ATTACHED_OPP_SKEW_LIMIT;
         crs.Disable_Related_Records_Filter__c = false;
         crs.AccountHardCreditNonSkew_Incremental__c = true;
         crs.ContactHardCreditNonSkew_Incremental__c = true;
@@ -901,6 +940,7 @@ public without sharing class UTIL_CustomSettingsFacade {
         customizableRollupSettings.Rollups_Contact_Batch_Size__c = mySettings.Rollups_Contact_Batch_Size__c;
         customizableRollupSettings.Rollups_Account_Soft_Credit_Batch_Size__c = mySettings.Rollups_Account_Soft_Credit_Batch_Size__c;
         customizableRollupSettings.Rollups_Contact_Soft_Credit_Batch_Size__c = mySettings.Rollups_Contact_Soft_Credit_Batch_Size__c;
+        customizableRollupSettings.Rollups_AcctContactSoftCredit_Batch_Size__c = mySettings.Rollups_AcctContactSoftCredit_Batch_Size__c;
         customizableRollupSettings.Rollups_Account_SkewMode_Batch_Size__c  = mySettings.Rollups_Account_SkewMode_Batch_Size__c;
         customizableRollupSettings.Rollups_Contact_SkewMode_Batch_Size__c  = mySettings.Rollups_Contact_SkewMode_Batch_Size__c;
         customizableRollupSettings.Rollups_GAU_Batch_Size__c = mySettings.Rollups_GAU_Batch_Size__c;
@@ -960,5 +1000,14 @@ public without sharing class UTIL_CustomSettingsFacade {
     private static void configLevelsSettings(Levels_settings__c ls) {
         // New default settings for the Levels Assignment engine
         ls.Level_Assignment_Batch_Size__c = 200;
+    }
+
+    /*******************************************************************************************************
+    * @description Sets data import settings for a test or in case they have been updated during processing.
+    * @param Data_Import_Settings__c
+    */
+    public static void setDataImportSettings(Data_Import_Settings__c dis) {
+        // New default settings for the Batch Data Import engine
+        dataImportSettings = dis;
     }
 }

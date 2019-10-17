@@ -475,6 +475,85 @@ private class CRLP_Batch_Base_TEST {
                 'The chunk mode start query should always contain "ORDER BY" and "LIMIT".');
     }
 
+    /**
+     * @description Confirms summary records are included if it has no detail records and has rollup states
+     */
+    @isTest
+    private static void shouldIncludeSummaryRecordsWithNoDetailsIfItHasRollupStates(){
+        Account rollupAccount = new Account(
+            Id = UTIL_UnitTestData_TEST.mockId(Account.SObjectType),
+            Name = 'Test Rollup Account'
+        );
+
+        CRLP_Batch_Base_NonSkew accountBatchJob = getBatchJobInstanceWithData(
+            CRLP_RollupProcessingOptions.RollupType.AccountHardCredit,
+            null);
+
+        Map<Id, List<CRLP_Rollup>> mockRollupStates = new Map<Id, List<CRLP_Rollup>>{
+            rollupAccount.Id => new List<CRLP_Rollup>{ new CRLP_Rollup(new Rollup__mdt()) }
+        };
+
+        CRLP_ApiService_TEST.Stub apiServiceStub = new CRLP_ApiService_TEST.Stub();
+        apiServiceStub.withReturnValue('getBaseRollupStateForRecords', mockRollupStates);
+
+        accountBatchJob.apiService = (CRLP_ApiService) Test.createStub(CRLP_ApiService.class, apiServiceStub);
+
+        List<SObject> includedRecords =
+            accountBatchJob.excludeSummaryWithMissingDetailRecords(new List<SObject>{rollupAccount}, new List<SObject>());
+
+        System.assertEquals(1, includedRecords.size());
+        System.assertEquals(rollupAccount.Id, includedRecords[0].Id,
+            'Summary records should be included if they have rollup states even if they have no detail records');
+    }
+
+    /**
+     * @description Confirms summary records are excluded if it has no detail records and no rollup states
+     */
+    @isTest
+    private static void shouldNotIncludeSummaryRecordsWithNoDetailsIfRollupStatesAreNotEnabled(){
+        Account rollupAccount = new Account(
+            Id = UTIL_UnitTestData_TEST.mockId(Account.SObjectType),
+            Name = 'Test Rollup Account'
+        );
+
+        Map<Id, List<CRLP_Rollup>> emptyMockRollupStates = new Map<Id, List<CRLP_Rollup>>{
+            rollupAccount.Id => new List<CRLP_Rollup>()
+        };
+
+        CRLP_Batch_Base_NonSkew accountBatchJob = getBatchJobInstanceWithData(
+            CRLP_RollupProcessingOptions.RollupType.AccountHardCredit,
+            null);
+
+        CRLP_ApiService_TEST.Stub apiServiceStub = new CRLP_ApiService_TEST.Stub();
+        apiServiceStub.withReturnValue('getBaseRollupStateForRecords', emptyMockRollupStates);
+
+        accountBatchJob.apiService = (CRLP_ApiService) Test.createStub(CRLP_ApiService.class, apiServiceStub);
+
+        List<SObject> includedRecords =
+            accountBatchJob.excludeSummaryWithMissingDetailRecords(new List<SObject>{rollupAccount}, new List<SObject>());
+
+        System.assert(includedRecords.isEmpty(),
+            'Summary records should not be included if they have no detail records and and rollup state');
+    }
+
+    /**
+     * @description Confirms RD NonSkew query does not include an inner join
+     */
+    @isTest
+    private static void shouldNotIncludeInnerJoinForRDNonSkewQuery() {
+        CRLP_RollupProcessingOptions.RollupTypeFilter typeFilter =
+                CRLP_RollupProcessingOptions.RollupTypeFilter.All;
+
+        CRLP_Batch_Base_NonSkew rdBatchJob = new CRLP_RD_BATCH(typeFilter);
+
+        CRLP_Batch_Base.BatchQueryBuilder queryBuilder =
+                new CRLP_Batch_Base.BatchQueryBuilder(rdBatchJob, null, null, null);
+        String query = queryBuilder.buildQuery().toUpperCase();
+
+        System.assertEquals(1, query.countMatches('SELECT'),
+            'Recurring Donation Nonskew query should not include inner join');
+    }
+
     /******************************** Helper Methods *****************************/
 
     /**

@@ -9,7 +9,7 @@ Suite Teardown  Delete Records and Close Browser
 
 Select an opportunity for an account make grid changes and process it
     #Select an opportunity for an account, make grid changes, and process it
-    [tags]  unstable
+    [tags]  stable
     Set Window Size    1024    768
     ${ns} =  Get NPSP Namespace Prefix
     &{batch} =       API Create DataImportBatch    
@@ -31,14 +31,13 @@ Select an opportunity for an account make grid changes and process it
     Select Value From BGE DD    Donor Type    Account
     Populate Field By Placeholder    Search Accounts    &{account}[Name]
     Click Link    &{account}[Name]
-    Click Link    Review Donations
+    Click Link With Text    Review Donations
     Click BGE Button    Update this Opportunity
     Fill BGE Form
     ...                       Donation Amount=20
     Click Element With Locator    bge.field-input    Donation Date
     Click BGE Button    Today
     Click BGE Button       Save
-    Reload Page
     Sleep    2
     Verify Row Count    1
     Page Should Contain Link    &{opportunity}[Name]
@@ -46,12 +45,12 @@ Select an opportunity for an account make grid changes and process it
     Click BGE Edit Button    Donation Amount   
     Wait For Locator    bge.edit_field  
     Populate BGE Edit Field    Donation Amount    10
+    Scroll Page To Location    0    0
     Click BGE Button       Process Batch
-    # Select Frame With Title    NPSP Data Import
-    # Click Button With Value   Begin Data Import Process
     Click Data Import Button    NPSP Data Import    button    Begin Data Import Process
-    Wait For Locator    data_imports.status    Completed
+    Wait For Batch To Complete    data_imports.status    Completed
     Click Button With Value   Close
+    Wait Until Element Is Visible    text:All Gifts
     Go To Record Home    &{opportunity}[Id]
     Confirm Value    Amount    $10.00    Y 
     ${opp_date} =     Get Current Date    result_format=%-m/%-d/%Y

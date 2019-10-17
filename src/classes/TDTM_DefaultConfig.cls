@@ -134,9 +134,9 @@ public without sharing class TDTM_DefaultConfig {
               Class__c = 'REL_Relationships_Cm_TDTM', Load_Order__c = 1, Object__c = 'CampaignMember',
               Trigger_Action__c = 'AfterInsert;AfterUpdate'));
 
-        // Relationships on Contact
+        // Relationships on Contact -- Moving to after the CON_CascadeDeleteLookups_TDTM trigger (loadorder of 1)
         handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
-              Class__c = 'REL_Relationships_Con_TDTM', Load_Order__c = 1, Object__c = 'Contact',
+              Class__c = 'REL_Relationships_Con_TDTM', Load_Order__c = 2, Object__c = 'Contact',
               Trigger_Action__c = 'AfterInsert;AfterUpdate;AfterDelete'));
 
         // Relationships on npe4__Relationship__c
@@ -182,7 +182,12 @@ public without sharing class TDTM_DefaultConfig {
         // RecurringDonations on RecurringDonations
         handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
               Class__c = 'RD_RecurringDonations_TDTM', Load_Order__c = 1, Object__c = 'npe03__Recurring_Donation__c',
-              Trigger_Action__c = 'BeforeInsert;BeforeUpdate;AfterInsert;AfterUpdate'));
+              Trigger_Action__c = 'BeforeDelete;BeforeInsert;BeforeUpdate;AfterInsert;AfterUpdate'));
+
+        // Enhanced Recurring Donations trigger handler
+        handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
+              Class__c = 'RD2_RecurringDonations_TDTM', Load_Order__c = 2, Object__c = 'npe03__Recurring_Donation__c',
+              Trigger_Action__c = 'BeforeDelete;BeforeInsert;BeforeUpdate;AfterInsert;AfterUpdate'));
 
         // OppRollups on Opportunity
         handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
@@ -224,6 +229,11 @@ public without sharing class TDTM_DefaultConfig {
               Class__c = 'ADDR_Validator_TDTM', Load_Order__c = 1, Object__c = 'Address__c',
               Trigger_Action__c = 'BeforeInsert;BeforeUpdate;AfterInsert;AfterUpdate'));
 
+        // Payment and Opportunity Allocation Sync on Allocation object
+        handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
+              Class__c = 'ALLO_PaymentSync_TDTM', Load_Order__c = 4, Object__c = 'Allocation__c',
+              Trigger_Action__c = 'AfterInsert;AfterUpdate;AfterDelete')); //TODO AfterUndelete?
+
         // Payment Allocation on Allocation object
         handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
               Class__c = 'ALLO_Allocations_TDTM', Load_Order__c = 1, Object__c = 'Allocation__c',
@@ -259,9 +269,9 @@ public without sharing class TDTM_DefaultConfig {
               Class__c = 'CON_DoNotContact_TDTM', Load_Order__c = 2, Object__c = 'Contact',
               Trigger_Action__c = 'BeforeInsert;BeforeUpdate'));
 
-        // Contact Merge on Contact object
+        // Contact Merge on Contact object (moving to 3 so it's always after REL_Relationships_Con_TDTM)
         handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
-              Class__c = 'CON_ContactMerge_TDTM', Load_Order__c = 2, Object__c = 'Contact',
+              Class__c = 'CON_ContactMerge_TDTM', Load_Order__c = 3, Object__c = 'Contact',
               Trigger_Action__c = 'AfterDelete'));
 
         // Opportunity Matching Gifts support
@@ -346,6 +356,10 @@ public without sharing class TDTM_DefaultConfig {
         handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
                 Class__c = 'CRLP_Rollup_TDTM', Load_Order__c = 2, Object__c = 'npe01__OppPayment__c',
                 Trigger_Action__c = 'AfterInsert;AfterUpdate;AfterDelete;AfterUndelete'));
+
+        handlers.add(new Trigger_Handler__c(Active__c = true, Asynchronous__c = false,
+                Class__c = 'GAU_TDTM', Load_Order__c = 1, Object__c = 'General_Accounting_Unit__c',
+                Trigger_Action__c = 'BeforeDelete;'));
 
         return handlers;
     }

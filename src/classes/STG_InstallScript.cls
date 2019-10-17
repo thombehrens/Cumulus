@@ -41,7 +41,8 @@ global without sharing class STG_InstallScript implements InstallHandler {
         INSERT_TDTM_DEFAULTS, ABORT_OLD_SCHEDULED_JOBS, 
         CLEANUP_RECORD_TYPE_SETTINGS, UPDATE_CAMPAIGN_LIST_REPORT,
         UPDATE_ORG_TELEMETRY, CREATE_DEFAULT_SETTINGS_FOR_UPGRADE,
-        CREATE_DEFAULT_SETTINGS_FOR_NEW_INSTALL
+        CREATE_DEFAULT_SETTINGS_FOR_NEW_INSTALL, 
+        CREATE_OPP_STAGE_TO_STATE_RECORDS
     }
 
     /*******************************************************************************************************
@@ -122,6 +123,8 @@ global without sharing class STG_InstallScript implements InstallHandler {
 
             } else if (action == InstallAction.CREATE_DEFAULT_SETTINGS_FOR_NEW_INSTALL) {
                 populateNamespacePrefix();
+            } else if (action == InstallAction.CREATE_OPP_STAGE_TO_STATE_RECORDS) {
+                createOppStageToStateRecordsIfNecessary();
             }
 
         } catch(Exception e) {
@@ -317,7 +320,7 @@ global without sharing class STG_InstallScript implements InstallHandler {
     * added
     */
     private void createNewDefaultCustomSettingRecords() {
-        UTIL_CustomSettingsFacade.getOrgCustomizableRollupSettings();
+        updateDefaultRollupSettings();
         updateDefaultOrgContactsSettings();
     }
 
@@ -334,6 +337,31 @@ global without sharing class STG_InstallScript implements InstallHandler {
     }
 
     /*******************************************************************************************************
+    * @description Ensure that any default Org Rollup Settigns are updated for custom settings 
+    * objects accordingly.  There was a swap of custom setting fields to get the account soft credit settings
+    * pointed to the corresponding setting
+    */
+    public static void updateDefaultRollupSettings() {
+        Customizable_Rollup_Settings__c rollupSettings = UTIL_CustomSettingsFacade.getOrgCustomizableRollupSettings();
+        Boolean isUpdateNeeded = false;
+        Decimal currentAccountSoftCreditBatchSize = UTIL_CustomSettingsFacade.DEFAULT_ROLLUP_BATCH_SIZE;
+
+        if (rollupSettings.Rollups_Account_Soft_Credit_Batch_Size__c != null) {
+            currentAccountSoftCreditBatchSize = rollupSettings.Rollups_Account_Soft_Credit_Batch_Size__c;
+        }
+
+        if (rollupSettings.Rollups_AcctContactSoftCredit_Batch_Size__c == null) {
+            rollupSettings.Rollups_AcctContactSoftCredit_Batch_Size__c = currentAccountSoftCreditBatchSize;
+            isUpdateNeeded = true;
+        }
+        
+        if (isUpdateNeeded) {
+            update rollupSettings;
+        }
+        
+    }
+
+    /*******************************************************************************************************
     * @description Make sure a value is set for the namespace prefix custom setting.
     */
     private void populateNamespacePrefix() {
@@ -341,6 +369,27 @@ global without sharing class STG_InstallScript implements InstallHandler {
         if (pkgSettings.Id == null) {
             pkgSettings.Namespace_Prefix__c = UTIL_Namespace.StrTokenNSPrefix('');
             insert pkgSettings;
+        }
+    }
+
+    /*******************************************************************************************************
+    * @description Creates the finalized opp stage to state record based on what value is set as the 
+    * "Opportunity Stage for When Fully Paid" 
+    */
+    private void createOppStageToStateRecordsIfNecessary() {
+
+        // This is no longer being called in the post install script at all.
+        // We will revisit this very soon.
+        // There was issues with the upgrade process, so we are unable to
+        // get this in before GA.
+        List<Metadata.CustomMetadata> metadataToInsert = new List<Metadata.CustomMetadata>();
+        Map<String, Object> params = new Map<String, Object>();
+
+        metadataToInsert = Opp_StageMappingCMT.createPledgedOppStageToStateRecord(metadataToInsert);
+        metadataToInsert = Opp_StageMappingCMT.createFinalizedOppStageToStateRecord(metadataToInsert);
+
+        if (!metadataToInsert.isEmpty()) {
+            Opp_StageMappingCMT.deployOppStageToStateMetadata(metadataToInsert, params);
         }
     }
 
@@ -407,13 +456,13 @@ global without sharing class STG_InstallScript implements InstallHandler {
             try {
                 Messaging.SingleEmailMessage mail = new Messaging.SingleEmailMessage();
                 mail.setUseSignature(false);
-                mail.setReplyTo('donotreply@salesforce.org');
-                mail.setSenderDisplayName('Nonprofit Success Pack');
+                mail.setReplyTo(ERR_Notifier.EMAIL_REPLY_TO);
+                mail.setSenderDisplayName(ERR_Notifier.EMAIL_SENDER_NAME);
                 mail.setSubject('NPSP Install Errors');
 
                 mail.setPlainTextBody(buildEmailBody());  
 
-                mail.setToAddresses(new String[] { 'errors@salesforce.org', getUserEmail() });
+                mail.setToAddresses(new String[] { ERR_Notifier.EMAIL_SYSTEM_ERRORS_TO, getUserEmail() });
 
                 Messaging.sendEmail(new Messaging.SingleEmailMessage[] { mail });
 

@@ -2,7 +2,7 @@
 
 Resource        robot/Cumulus/resources/NPSP.robot
 Suite Setup     Open Test Browser
-Suite Teardown  Delete Records and Close Browser
+Suite Teardown  Capture Screenshot and Delete Records and Close Browser
 
 
 *** Test Cases ***
@@ -28,29 +28,25 @@ Find Matching Gifts
     Click Link    link=Find Matched Gifts
     Choose Frame    vfFrameId
     Page Should Contain Link    &{Contact1}[FirstName] $50 donation    limit=1
-    Select Lightning Table Checkbox     &{Contact1}[FirstName] $50 donation
+    Select Lightning Checkbox     &{Contact1}[FirstName] $50 donation
     Click Link    link=Find More Gifts
     Populate Modal Field    Primary Contact    &{Contact2}[FirstName] &{Contact2}[LastName]
     Click Button With Value    Search
-    Select Lightning Table Checkbox     &{Contact2}[FirstName] $25 donation
+    Select Lightning Checkbox     &{Contact2}[FirstName] $25 donation
     Click Button With Value    Save 
     Reload Page
     Select Tab    Related  
-    Select Relatedlist    Contact Roles
-    Verify Related List Field Values
+    Verify Related Object Field Values    Contact Roles
     ...                     &{contact1}[FirstName] &{contact1}[LastName]=Matched Donor
     ...                     &{contact2}[FirstName] &{contact2}[LastName]=Matched Donor
     Go To Record Home  &{opportunity3}[Id]
     Select Tab    Related
-    Select Relatedlist    Partial Soft Credits
-    Verify Related List Field Values
-    ...                     &{contact1}[LastName] Household=$50.00
-    ...                     &{contact2}[LastName] Household=$25.00  
+    Verify Related Object Field Values    Partial Soft Credits
+    ...                     &{contact1}[FirstName] &{contact1}[LastName]=$50.00
+    ...                     &{contact2}[FirstName] &{contact2}[LastName]=$25.00  
     Go To Record Home  &{opportunity3}[Id]
     Select Tab    Related
-    Load Related List    Matched Gifts
-    Click Viewall Related List    Matched Gifts
-    Verify Related List Field Values
+    Verify Related Object Field Values    Matched Gifts
     ...                     &{opportunity1}[Name]=$50.00
     ...                     &{opportunity2}[Name]=$25.00  
     Go To Record Home  &{opportunity1}[Id]

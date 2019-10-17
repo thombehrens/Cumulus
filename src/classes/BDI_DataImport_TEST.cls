@@ -378,16 +378,20 @@ public with sharing class BDI_DataImport_TEST {
         // existing 1x1 contact
         UTIL_UnitTestData_TEST.createAccountContactTestData(CAO_Constants.ONE_TO_ONE_ORGANIZATION_TYPE, 1, 1, 0);   
         List<Contact> listConExisting = getContacts();
+
+        Contact matched00Contact = listConExisting[0];
+
         System.assertEquals(1, listConExisting.size());
         System.assertEquals(CAO_Constants.ONE_TO_ONE_ORGANIZATION_TYPE, listConExisting[0].Account.npe01__System_AccountType__c);
-        System.assertEquals('TestFirstname00 TestLastname00', listConExisting[0].Name);
-        listConExisting[0].email = 'foo@bar.com';
+        System.assert(matched00Contact.Name.startsWith('TestFirstName00'),
+            'The name of the First Contact retrieved does not start with "TestFirstName00"');
+        listConExisting[0].Email = 'foo@bar.com';
         update listConExisting;
 
         UTIL_UnitTestData_TEST.setFixedSearchResults(listConExisting);
-        
+
         List<DataImport__c> dataImports = new List<DataImport__c>();
-        dataImports.add(newDI('TestFirstname00', 'TestLastname00', 'c2', 'C2', new Address__c(MailingCity__c='Seattle')));
+        dataImports.add(newDI(matched00Contact.FirstName, matched00Contact.LastName, 'c2', 'C2', new Address__c(MailingCity__c='Seattle')));
         dataImports[0].Contact1_Personal_Email__c = 'foo@bar.com';
         insert dataImports;
           
@@ -401,7 +405,7 @@ public with sharing class BDI_DataImport_TEST {
         // verify expected results
         List<Contact> listCon = getContacts();
         System.assertEquals(1, listCon.size());
-        System.assertEquals('TestFirstname00 TestLastname00', listCon[0].Name);
+        System.assertEquals(matched00Contact.Name, listCon[0].Name);
 
         dataImports = getDataImports();
         System.assertEquals(1, dataImports.size());
@@ -1345,8 +1349,10 @@ public with sharing class BDI_DataImport_TEST {
 
         //run batch data import
         Test.StartTest();
-        BDI_DataImport_BATCH bdi = new BDI_DataImport_BATCH();
-        bdi.isDryRun = true;
+        BDI_DataImportService dataImportService = 
+            new BDI_DataImportService(true, BDI_FieldMappingHelpText.getInstance());
+
+        BDI_DataImport_BATCH bdi = new BDI_DataImport_BATCH(dataImportService);
         ID ApexJobId = Database.executeBatch(bdi, 10);
         Test.stopTest();
 
@@ -1452,8 +1458,10 @@ public with sharing class BDI_DataImport_TEST {
 
         //run batch data import
         Test.StartTest();
-        BDI_DataImport_BATCH bdi = new BDI_DataImport_BATCH();
-        bdi.isDryRun = true;
+        BDI_DataImportService dataImportService = 
+            new BDI_DataImportService(true, BDI_FieldMappingHelpText.getInstance());
+
+        BDI_DataImport_BATCH bdi = new BDI_DataImport_BATCH(dataImportService);
         ID ApexJobId = Database.executeBatch(bdi, 10);
         Test.stopTest();
 
@@ -1496,19 +1504,36 @@ public with sharing class BDI_DataImport_TEST {
 
         //run batch data import
         Test.StartTest();
-        BDI_DataImport_BATCH bdi = new BDI_DataImport_BATCH();
-        bdi.isDryRun = true;
+
+        // create import service for dry run
+        BDI_DataImportService dataImportService = 
+            new BDI_DataImportService(true, BDI_FieldMappingHelpText.getInstance());
+
+        BDI_DataImport_BATCH bdi = new BDI_DataImport_BATCH(dataImportService);
         ID ApexJobId = Database.executeBatch(bdi, 10);
-        bdi.isDryRun = false;
+        
+        // create import service without dry run
+        dataImportService = new BDI_DataImportService(false, BDI_FieldMappingHelpText.getInstance());
+        bdi = new BDI_DataImport_BATCH(dataImportService);
         ID ApexJobId2 = Database.executeBatch(bdi, 10);
         Test.stopTest();
 
         //verify dry run statuses and import fields
         dataImports = getDataImports();
-        System.assertEquals(System.Label.bdiMatchedId, dataImports[0].DonationCampaignImportStatus__c);
-        System.assertEquals(campaigns[0].Id, dataImports[0].DonationCampaignImported__c);
-        System.assertEquals(System.Label.bdiMatched, dataImports[1].DonationCampaignImportStatus__c);
-        System.assertEquals(campaigns[1].Id, dataImports[1].DonationCampaignImported__c);
+
+        Map<Id, DataImport__c> dataImportsByCampaignId = new Map<Id, DataImport__c>();
+        dataImportsByCampaignId.put(dataImports[0].DonationCampaignImported__c, dataImports[0]);
+        dataImportsByCampaignId.put(dataImports[1].DonationCampaignImported__c, dataImports[1]);
+
+        System.assert(dataImportsByCampaignId.containsKey(campaigns[0].Id), 
+            'A data import should have matched '+campaigns[0].Name);
+        System.assert(dataImportsByCampaignId.containsKey(campaigns[1].Id), 
+            'A data import should have matched '+campaigns[1].Name);
+
+        System.assertEquals(System.Label.bdiMatchedId, 
+            dataImportsByCampaignId.get(campaigns[0].Id).DonationCampaignImportStatus__c);
+        System.assertEquals(System.Label.bdiMatched, 
+            dataImportsByCampaignId.get(campaigns[1].Id).DonationCampaignImportStatus__c);
     }
 
     /*********************************************************************************************************
